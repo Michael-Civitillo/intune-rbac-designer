@@ -26,6 +26,8 @@ Built for Intune admins who need to think through role permissions before commit
 
 **Export comparison image** — Generate a side-by-side PNG of all roles showing which permissions each one has selected. Useful for reviews and documentation.
 
+**Resizable sidebar** — Drag the right edge of the sidebar to make the role column wider or narrower. Long role names and folder names display in full at whatever width you choose. The width is remembered between sessions.
+
 **Dark mode** — Follows your system preference and can be toggled manually.
 
 **Persists locally** — Everything saves to `localStorage` automatically. Your roles are there next time you open the file.
