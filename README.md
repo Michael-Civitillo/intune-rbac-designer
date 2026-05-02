@@ -94,3 +94,9 @@ If Microsoft adds new permissions in a future update, edit `permissions.js` to a
 Roles and folders are saved to `localStorage` under the key `intuneRbacRoles`. If you want to back up your work or move it to another machine, open DevTools → Application → Local Storage, copy the value, and paste it on the other machine.
 
 Data format is versioned — the app handles migrating from older saves automatically.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE) © Michael Civitillo.
