@@ -6,6 +6,10 @@ Built for Intune admins who need to think through role permissions before commit
 
 ---
 
+![Overview](docs/screenshots/overview-light.jpg)
+
+---
+
 ## What it does
 
 **Design roles visually** — Browse all 53 Intune permission categories (pulled from Microsoft Learn), check off the exact permissions each role needs, and see a live count as you go.
@@ -27,6 +31,19 @@ Built for Intune admins who need to think through role permissions before commit
 **Dark mode** — Follows your system preference and can be toggled manually.
 
 **Persists locally** — Everything saves to `localStorage` automatically. Your roles are there next time you open the file.
+
+---
+
+## Screenshots
+
+### Resizable sidebar — drag to reveal full role and folder names
+![Resizable sidebar](docs/screenshots/sidebar-resized.jpg)
+
+### Permission picker with folder structure
+![Permission picker](docs/screenshots/permissions-picker.jpg)
+
+### Dark mode
+![Dark mode](docs/screenshots/dark-mode.jpg)
 
 ---
 
