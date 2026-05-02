@@ -753,10 +753,59 @@ function loadDarkMode() {
 // ── Main Render ───────────────────────────────────────────────────────────────
 function render() { renderSidebar(); renderMainPanel(); }
 
+// ── Sidebar Resize ────────────────────────────────────────────────────────────
+const SIDEBAR_WIDTH_KEY = 'intuneRbacSidebarWidth';
+const SIDEBAR_MIN_WIDTH = 160;
+const SIDEBAR_MAX_WIDTH = 520;
+
+function loadSidebarWidth() {
+  const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+  if (!saved) return;
+  const width = parseInt(saved, 10);
+  if (width >= SIDEBAR_MIN_WIDTH && width <= SIDEBAR_MAX_WIDTH) {
+    document.getElementById('sidebar').style.width = width + 'px';
+  }
+}
+
+function initSidebarResize() {
+  const handle  = document.getElementById('sidebar-resize-handle');
+  const sidebar = document.getElementById('sidebar');
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const startX     = e.clientX;
+    const startWidth = sidebar.getBoundingClientRect().width;
+
+    handle.classList.add('resizing');
+    document.body.style.cursor     = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    function onMouseMove(e) {
+      const newWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, startWidth + e.clientX - startX));
+      sidebar.style.width = newWidth + 'px';
+    }
+
+    function onMouseUp() {
+      handle.classList.remove('resizing');
+      document.body.style.cursor     = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup',   onMouseUp);
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, Math.round(parseFloat(sidebar.style.width)));
+    }
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup',   onMouseUp);
+  });
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   loadDarkMode();
+  loadSidebarWidth();
   loadState();
+
+  initSidebarResize();
 
   document.getElementById('btn-dark-mode').addEventListener('click', () => {
     applyDarkMode(document.documentElement.getAttribute('data-theme') !== 'dark');

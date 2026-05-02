@@ -150,12 +150,32 @@ header .header-actions {
 /* ── Sidebar ── */
 .sidebar {
   width: var(--sidebar-width);
+  min-width: 160px;
+  max-width: 520px;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   overflow: hidden;
+  position: relative;
+}
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 20;
+  background: transparent;
+  transition: background var(--transition);
+}
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.resizing {
+  background: var(--blue-accent);
+  opacity: 0.35;
 }
 
 .sidebar-header {
