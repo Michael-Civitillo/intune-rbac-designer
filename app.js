@@ -223,6 +223,65 @@ function deleteRole(id) {
 
 function getActiveRole() { return roles.find(r => r.id === activeRoleId) || null; }
 
+// ── Destructive Permission Confirmation ───────────────────────────────────────
+const DESTRUCTIVE_PERMISSIONS = new Set([
+  permKey('Managed devices',  'Delete'),
+  permKey('Managed apps',     'Wipe'),
+  permKey('Remote tasks',     'Wipe'),
+  permKey('Remote tasks',     'Retire'),
+  permKey('Remote tasks',     'Reset passcode'),
+  permKey('Remote tasks',     'Disable lost mode'),
+]);
+
+let suppressDestructiveWarnings = false;
+
+function isDestructive(category, action) {
+  return DESTRUCTIVE_PERMISSIONS.has(permKey(category, action));
+}
+
+function getPermDescription(category, action) {
+  return PERMISSIONS_DATA.find(c => c.category === category)
+    ?.permissions.find(p => p.action === action)?.description || '';
+}
+
+function confirmDestructive(items) {
+  return new Promise(resolve => {
+    if (suppressDestructiveWarnings || items.length === 0) { resolve(true); return; }
+
+    const modal     = document.getElementById('destructive-modal');
+    const list      = document.getElementById('destructive-list');
+    const dontShow  = document.getElementById('destructive-dont-show');
+    const btnOk     = document.getElementById('destructive-confirm');
+    const btnCancel = document.getElementById('destructive-cancel');
+
+    list.innerHTML = items.map(({ category, action }) => `
+      <li>
+        <span class="destructive-perm-name">${escHtml(category)} — ${escHtml(action)}</span>
+        <span class="destructive-perm-desc">${escHtml(getPermDescription(category, action))}</span>
+      </li>`).join('');
+    dontShow.checked = false;
+
+    function cleanup() {
+      modal.classList.remove('open');
+      btnOk.removeEventListener('click', onOk);
+      btnCancel.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKey);
+    }
+    function onOk()     { if (dontShow.checked) suppressDestructiveWarnings = true; cleanup(); resolve(true); }
+    function onCancel() { cleanup(); resolve(false); }
+    function onBackdrop(e) { if (e.target === modal) onCancel(); }
+    function onKey(e)      { if (e.key === 'Escape') onCancel(); }
+
+    btnOk.addEventListener('click', onOk);
+    btnCancel.addEventListener('click', onCancel);
+    modal.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+    modal.classList.add('open');
+    btnCancel.focus();
+  });
+}
+
 // ── Permission Toggle ─────────────────────────────────────────────────────────
 function togglePermission(category, action) {
   const role = getActiveRole();
@@ -234,12 +293,20 @@ function togglePermission(category, action) {
   updateSidebarCount(role);
 }
 
-function toggleCategory(category) {
+async function toggleCategory(category) {
   const role = getActiveRole();
   if (!role) return;
   const cat = PERMISSIONS_DATA.find(c => c.category === category);
   if (!cat) return;
   const allSelected = cat.permissions.every(p => role.permissions.has(permKey(category, p.action)));
+
+  if (!allSelected) {
+    const pending = cat.permissions
+      .filter(p => isDestructive(category, p.action) && !role.permissions.has(permKey(category, p.action)))
+      .map(p => ({ category, action: p.action }));
+    if (pending.length > 0 && !(await confirmDestructive(pending))) return;
+  }
+
   cat.permissions.forEach(p => {
     const key = permKey(category, p.action);
     allSelected ? role.permissions.delete(key) : role.permissions.add(key);
@@ -690,11 +757,19 @@ function renderMainPanel() {
   });
 
   document.querySelectorAll('.perm-row input[type="checkbox"]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const row = cb.closest('.perm-row');
-      togglePermission(row.dataset.cat, row.dataset.action);
+    cb.addEventListener('change', async () => {
+      const row    = cb.closest('.perm-row');
+      const cat    = row.dataset.cat;
+      const action = row.dataset.action;
+
+      if (cb.checked && isDestructive(cat, action)) {
+        const ok = await confirmDestructive([{ category: cat, action }]);
+        if (!ok) { cb.checked = false; return; }
+      }
+
+      togglePermission(cat, action);
       row.classList.toggle('selected', cb.checked);
-      updateCategoryHeader(row.dataset.cat);
+      updateCategoryHeader(cat);
     });
   });
 

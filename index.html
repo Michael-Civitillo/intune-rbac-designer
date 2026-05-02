@@ -101,6 +101,35 @@
     </div>
   </div>
 
+  <!-- ── Destructive Permission Modal ── -->
+  <div class="modal-overlay" id="destructive-modal">
+    <div class="modal modal-warning" role="dialog" aria-labelledby="destructive-title" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-warning-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <h2 id="destructive-title">High-impact permission</h2>
+      </div>
+      <div class="modal-body">
+        <p class="destructive-lead">You're about to grant a permission that can cause <strong>data loss</strong>, remove devices from management, or otherwise be hard to undo:</p>
+        <ul id="destructive-list" class="destructive-list"></ul>
+        <p class="destructive-tail">Make sure this role really needs it before continuing.</p>
+        <label class="modal-checkbox">
+          <input type="checkbox" id="destructive-dont-show" />
+          <span>Don't show this warning again in this window</span>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="destructive-cancel">Cancel</button>
+        <button class="btn btn-warning" id="destructive-confirm">Add anyway</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Tooltip ── -->
   <div class="tooltip" id="tooltip" role="tooltip"></div>
 

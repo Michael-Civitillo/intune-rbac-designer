@@ -28,6 +28,8 @@ Built for Intune admins who need to think through role permissions before commit
 
 **Resizable sidebar** — Drag the right edge of the sidebar to make the role column wider or narrower. Long role names and folder names display in full at whatever width you choose. The width is remembered between sessions.
 
+**Destructive-permission guardrail** — When you grant a high-impact permission like *Wipe*, *Retire*, *Reset passcode*, or *Delete* on managed devices, the app asks you to confirm before it's added. If you're sure you want to keep moving fast, tick "Don't show this warning again in this window" and the prompt is suppressed for the rest of the session.
+
 **Dark mode** — Follows your system preference and can be toggled manually.
 
 **Persists locally** — Everything saves to `localStorage` automatically. Your roles are there next time you open the file.
@@ -41,6 +43,9 @@ Built for Intune admins who need to think through role permissions before commit
 
 ### Permission picker with folder structure
 ![Permission picker](docs/screenshots/permissions-picker.jpg)
+
+### Confirmation prompt for high-impact permissions
+![Destructive permission warning](docs/screenshots/destructive-warning.jpg)
 
 ### Dark mode
 ![Dark mode](docs/screenshots/dark-mode.jpg)

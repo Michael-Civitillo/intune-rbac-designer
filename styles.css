@@ -810,6 +810,15 @@ header .header-actions {
 }
 .btn-outline-primary:hover { background: var(--bg-cat-sel); }
 
+.btn-warning {
+  background: #d97706;
+  color: var(--white);
+  border-color: #d97706;
+}
+.btn-warning:hover { background: #b45309; border-color: #b45309; }
+[data-theme="dark"] .btn-warning { background: #b45309; border-color: #b45309; }
+[data-theme="dark"] .btn-warning:hover { background: #92400e; border-color: #92400e; }
+
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn-full { width: 100%; justify-content: center; }
 
@@ -887,6 +896,78 @@ header .header-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* ── Destructive Permission Modal ── */
+.modal-warning {
+  max-width: 520px;
+  border-top: 4px solid #d97706;
+}
+.modal-warning-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fef3c7;
+  color: #b45309;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+[data-theme="dark"] .modal-warning-icon {
+  background: rgba(217, 119, 6, 0.18);
+  color: #fbbf24;
+}
+.destructive-lead {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.destructive-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  background: var(--bg-stat);
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.destructive-list li {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.destructive-list .destructive-perm-name {
+  font-weight: 600;
+}
+.destructive-list .destructive-perm-desc {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+.destructive-tail {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+.modal-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.modal-checkbox input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--blue-accent);
 }
 
 /* ── Summary Modal Styles ── */
