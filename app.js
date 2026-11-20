@@ -44,6 +44,15 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+// Carry selections across permissions Microsoft has renamed (see PERMISSION_RENAMES)
+function migratePermissions(keys) {
+  const perms = new Set(keys);
+  PERMISSION_RENAMES.forEach(({ category, from, to }) => {
+    if (perms.delete(permKey(category, from))) perms.add(permKey(category, to));
+  });
+  return perms;
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -52,11 +61,11 @@ function loadState() {
 
     // Backward-compat: old format was a plain array of roles
     if (Array.isArray(data)) {
-      roles  = data.map(r => ({ id: r.id, name: r.name, groupId: null, permissions: new Set(r.permissions) }));
+      roles  = data.map(r => ({ id: r.id, name: r.name, groupId: null, permissions: migratePermissions(r.permissions) }));
       groups = [];
     } else {
       groups = (data.groups || []).map(g => ({ id: g.id, name: g.name, collapsed: !!g.collapsed }));
-      roles  = (data.roles  || []).map(r => ({ id: r.id, name: r.name, groupId: r.groupId || null, permissions: new Set(r.permissions) }));
+      roles  = (data.roles  || []).map(r => ({ id: r.id, name: r.name, groupId: r.groupId || null, permissions: migratePermissions(r.permissions) }));
     }
 
     if (roles.length > 0) activeRoleId = roles[0].id;

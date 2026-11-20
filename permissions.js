@@ -1,3 +1,6 @@
+// Intune custom role permissions.
+// Source: https://learn.microsoft.com/intune/fundamentals/role-based-access-control/create-custom-role
+// Last synced: 2026-11-20 (Learn page revision of 2026-11-12, Intune service release 2611).
 const PERMISSIONS_DATA = [
   {
     category: "Admin tasks",
@@ -11,11 +14,12 @@ const PERMISSIONS_DATA = [
   {
     category: "Android Enterprise",
     permissions: [
-      { action: "Enrollment time device membership assignment", description: "Allows Intune to assign devices to Microsoft Entra ID groups during enrollment." },
+      { action: "Enrollment time device membership assignment for Android Enterprise", description: "Allows Intune to assign devices to Microsoft Entra ID groups during enrollment." },
       { action: "Read", description: "View the Android Enterprise configuration used to sync applications with the Managed Google Play store or view the Android Enterprise enrollment prerequisites and enrollment profiles." },
       { action: "Update app sync", description: "Manage or change the Managed Google Play configuration used to sync applications with the Managed Google Play store, or sync the apps you approved from the store with Intune." },
       { action: "Update enrollment profiles", description: "Manage or change Android Enterprise Device Owner enrollment profiles used to enroll devices." },
-      { action: "Update onboarding", description: "Manage or change the Android Enterprise binding to Managed Google Play and other account-wide configurations." }
+      { action: "Update onboarding", description: "Manage or change the Android Enterprise binding to Managed Google Play and other account-wide configurations." },
+      { action: "Manage zero touch enrollment", description: "Manage or change the connection to Google's Zero-Touch Enrollment (ZTE) portal." }
     ]
   },
   {
@@ -405,7 +409,8 @@ const PERMISSIONS_DATA = [
     permissions: [
       { action: "Elevation", description: "For Windows devices, elevation allows the helper to enter UAC credentials when prompted on the sharer's device when remote help is enabled. Enabling elevation also allows the helper to view and control the sharer's device when the sharer grants the helper access." },
       { action: "Take full control", description: "Take full control allows the helper to view and control the sharer's device when Remote Help is enabled for all platforms we support." },
-      { action: "Unattended control", description: "For Android devices, unattended control starts Remote Help as soon as the helper selects a new session, without a sharer having to grant access." },
+      { action: "Android unattended control", description: "Allows the helper to connect to Android devices without requiring the sharer to accept the connection each time. This capability requires the Android device to be enrolled in Intune as a dedicated device. Assign this permission explicitly and scope it to the specific devices that can receive unattended support." },
+      { action: "Windows unattended control remote sign-in", description: "Allows the helper to start an unattended remote sign-in session to a targeted, physical, corporate-owned Windows device without requiring the sharer to accept the connection each time. Assign this permission explicitly and scope it to the specific devices that can receive unattended support." },
       { action: "View screen", description: "View screen allows the helper to view the sharer's device when Remote Help is enabled for all platforms we support." }
     ]
   },
@@ -517,4 +522,11 @@ const PERMISSIONS_DATA = [
       { action: "Read", description: "View the code-signing certificate used to distribute line-of-business apps to your managed Windows devices." }
     ]
   }
+];
+
+// Permissions Microsoft has renamed. Roles saved under the old name are moved to
+// the new one on load, so a rename never silently drops a selection.
+const PERMISSION_RENAMES = [
+  { category: "Android Enterprise", from: "Enrollment time device membership assignment", to: "Enrollment time device membership assignment for Android Enterprise" },
+  { category: "Remote Help app", from: "Unattended control", to: "Android unattended control" }
 ];

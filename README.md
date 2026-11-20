@@ -85,7 +85,14 @@ The only external dependencies are SheetJS and html2canvas, both loaded from CDN
 
 The `permissions.js` file contains all Intune custom role permission scopes pulled directly from the Microsoft Learn documentation. Categories include Device Management, Mobile Apps, Managed Devices, Endpoint Security, Policy Sets, and 48 others.
 
-If Microsoft adds new permissions in a future update, edit `permissions.js` to add them — the rest of the app picks them up automatically.
+**Last synced with Microsoft Learn: November 2026** (Intune service release 2611) — 255 permissions across 53 categories. Changes picked up in that sync:
+
+- **Android Enterprise** — new *Manage zero touch enrollment* permission (2607). Access to the Google zero-touch portal no longer needs *Update app sync*.
+- **Android Enterprise** — *Enrollment time device membership assignment* is now *Enrollment time device membership assignment for Android Enterprise*.
+- **Remote Help app** — new *Windows unattended control remote sign-in* permission (2608).
+- **Remote Help app** — *Unattended control* is now *Android unattended control*.
+
+If Microsoft adds new permissions in a future update, edit `permissions.js` to add them — the rest of the app picks them up automatically. If Microsoft renames one, add it to `PERMISSION_RENAMES` at the bottom of the same file: roles saved under the old name are carried over to the new one the next time the app loads.
 
 ---
 
