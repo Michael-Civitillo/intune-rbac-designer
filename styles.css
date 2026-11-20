@@ -100,6 +100,16 @@
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
 html, body { height: 100%; }
+html { background: var(--bg); }
+
+/* The saved theme is applied by app.js once the page has loaded. (Reading localStorage any
+   earlier, from a script in <head>, occasionally hands a file:// page an empty store.)
+   Until then, follow the system setting and keep the content hidden so the wrong theme
+   never flashes. */
+html:not([data-theme]) body { visibility: hidden; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) { --bg: #0c1016; color-scheme: dark; }
+}
 
 body {
   font-family: var(--font);

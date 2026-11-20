@@ -1,0 +1,126 @@
+name: Windows app
+
+# Builds the portable Windows exe on every push so there is always a tested build to download
+# from the run's Artifacts. Pushing a tag like v1.2.0 also publishes it as a GitHub release.
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+    paths-ignore: ['docs/**', '**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install build tools
+        run: npm ci
+
+      # A release takes its version from the tag, so tagging is the only step needed to ship one
+      - name: Use the tag as the version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+
+      - name: Build the portable exe
+        run: npm run dist
+
+      - name: Test the app
+        run: node scripts/smoke-test.js "dist/win-unpacked/Intune RBAC Designer.exe"
+
+      - name: Check the portable exe starts
+        shell: pwsh
+        run: |
+          $exe = Get-Item dist/Intune-RBAC-Designer-*-win-x64.exe
+          Write-Host ("Starting {0} ({1:n0} MB)" -f $exe.Name, ($exe.Length / 1MB))
+          $started = Get-Date
+          Start-Process -FilePath $exe.FullName
+          $window = $null
+          while (-not $window -and ((Get-Date) - $started).TotalSeconds -lt 180) {
+            Start-Sleep -Seconds 2
+            $window = Get-Process -Name 'Intune RBAC Designer' -ErrorAction SilentlyContinue |
+              Where-Object { $_.MainWindowTitle -eq 'Intune RBAC Designer' } | Select-Object -First 1
+          }
+          if (-not $window) {
+            Get-Process | Where-Object MainWindowTitle | Format-Table Name, MainWindowTitle
+            throw 'The portable exe did not open its window within 3 minutes'
+          }
+          Write-Host ("Window open after {0:n0} seconds" -f ((Get-Date) - $started).TotalSeconds)
+          Get-Process -Name 'Intune RBAC Designer', 'Intune-RBAC-Designer-*' -ErrorAction SilentlyContinue | Stop-Process -Force
+
+      - name: Write checksum
+        shell: pwsh
+        run: |
+          $exe = Get-Item dist/Intune-RBAC-Designer-*-win-x64.exe
+          "$((Get-FileHash $exe -Algorithm SHA256).Hash.ToLower())  $($exe.Name)" | Set-Content dist/SHA256SUMS.txt -Encoding ascii
+          Get-Content dist/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Intune-RBAC-Designer-win-x64
+          path: |
+            dist/Intune-RBAC-Designer-*-win-x64.exe
+            dist/SHA256SUMS.txt
+            dist/smoke-test.png
+          if-no-files-found: error
+
+  # Runs no code from the repository: it only takes the tested build from the job above.
+  # On a normal push it stops after fetching the build; on a version tag it publishes it.
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: Intune-RBAC-Designer-win-x64
+          path: release
+
+      - name: Show what would be published
+        run: ls -l release && cat release/SHA256SUMS.txt
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cat > notes.md <<EOF
+          ## How to use it
+
+          1. Download **Intune-RBAC-Designer-${version}-win-x64.exe** below.
+          2. Double-click it. There is nothing to install and no admin rights are needed.
+
+          The first start takes a few seconds while the app unpacks itself.
+
+          Windows may show a blue "Windows protected your PC" prompt because the app is not code signed.
+          Choose **More info**, then **Run anyway**.
+
+          Your roles are saved on your PC and are still there the next time you open the app.
+          Exports are saved to your Downloads folder.
+          EOF
+          gh release create "$GITHUB_REF_NAME" release/*.exe release/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Intune RBAC Designer ${version}" \
+            --notes-file notes.md \
+            --generate-notes

@@ -1,0 +1,3 @@
+# Dependencies and build output for the Windows desktop app
+node_modules/
+dist/

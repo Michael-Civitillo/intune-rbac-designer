@@ -1,8 +1,22 @@
 # Intune RBAC Designer
 
-A local, zero-install web app for designing Microsoft Intune custom RBAC roles. Open `index.html` in any browser — no server, no build step, no dependencies to install.
+A local, zero-install app for designing Microsoft Intune custom RBAC roles. Run the Windows exe, or open `index.html` in any browser — no server, no installer, no accounts.
 
 Built for Intune admins who need to think through role permissions before committing them in the portal, share designs with teammates, or document what each role actually does.
+
+## Download for Windows
+
+1. Go to the [latest release](https://github.com/Michael-Civitillo/intune-rbac-designer/releases/latest) and download **Intune-RBAC-Designer-…-win-x64.exe**.
+2. Double-click it. That's it — nothing is installed and you don't need admin rights.
+
+Good to know:
+
+- **First start takes a few seconds.** The exe is a single portable file that unpacks itself each time it starts; a small "Starting…" window shows while it does.
+- **Windows may warn you.** The app isn't code signed, so SmartScreen can show "Windows protected your PC". Choose **More info**, then **Run anyway**. Some organizations block unsigned apps entirely; if yours does, use the browser version below.
+- **Your work is kept.** Roles are saved on your PC (under `%APPDATA%\Intune RBAC Designer`) and are there the next time you open the app, even if you move or re-download the exe.
+- **Exports go to Downloads**, and the file is highlighted in Explorer when it's ready.
+- **It stays offline.** The app makes no network connections.
+- Windows 10 or 11, 64-bit.
 
 ---
 
@@ -60,11 +74,10 @@ Built for Intune admins who need to think through role permissions before commit
 
 ## Getting started
 
-1. Clone or download this repo
-2. Open `index.html` in Chrome, Edge, or Safari
-3. Click **New Role** to create your first role
-4. Use the folder icon in the sidebar to create team folders
-5. When you're ready — export to Excel or grab a comparison image
+1. Start the app — the [Windows exe](#download-for-windows), or clone/download this repo and open `index.html` in Chrome, Edge, or Safari
+2. Click **New Role** to create your first role
+3. Use the folder icon in the sidebar to create team folders
+4. When you're ready — export to Excel or grab a comparison image
 
 That's it. No `npm install`, no config, no accounts.
 
@@ -82,8 +95,33 @@ Everything is vanilla HTML, CSS, and JavaScript. No frameworks, no build pipelin
 | `permissions.js` | All 53 Intune permission categories and descriptions |
 | `export-excel.js` | Excel export via SheetJS |
 | `export-image.js` | Comparison PNG via html2canvas |
+| `vendor/` | SheetJS and html2canvas, bundled so everything works offline |
+| `desktop/main.js` | The Windows app's shell: a window around the same page |
 
-The only external dependencies are SheetJS and html2canvas, both loaded from CDN. If you're offline, export won't work — everything else does.
+The only dependencies are SheetJS and html2canvas. Both are checked in under `vendor/` (versions, licenses and checksums are in `vendor/README.md`), so nothing is loaded from a CDN and exports work offline.
+
+---
+
+## Building the Windows app
+
+The exe is the same page wrapped in [Electron](https://www.electronjs.org/). You don't need to build it yourself: GitHub Actions does it on every push (`.github/workflows/windows-app.yml`), tests the result on a real Windows machine, and attaches the exe to the run under **Artifacts**.
+
+**To publish a release**, push a version tag. The build takes its version number from the tag and the exe is attached to a new GitHub release:
+
+```
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+To build locally on Windows instead (Node.js 22 or newer):
+
+```
+npm ci
+npm run dist        # writes dist/Intune-RBAC-Designer-<version>-win-x64.exe
+npm start           # or just run the app without packaging it
+```
+
+The exe is unsigned. To remove the SmartScreen warning it needs a code-signing certificate, which electron-builder can use once you have one.
 
 ---
 
@@ -106,7 +144,9 @@ If Microsoft adds new permissions in a future update, edit `permissions.js` to a
 
 ## Local storage
 
-Roles and folders are saved to `localStorage` under the key `intuneRbacRoles`. If you want to back up your work or move it to another machine, open DevTools → Application → Local Storage, copy the value, and paste it on the other machine.
+Roles and folders are saved to `localStorage` under the key `intuneRbacRoles`. If you want to back up your work or move it to another machine, open DevTools → Application → Local Storage, copy the value, and paste it on the other machine. (In the Windows app, press Alt to show the menu, then **View → Toggle Developer Tools**.)
+
+The Windows app and the browser version each keep their own copy; they don't share roles.
 
 Data format is versioned — the app handles migrating from older saves automatically.
 

@@ -5,17 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark" />
   <title>Intune RBAC Designer</title>
-  <script>
-    // Apply the saved (or system) theme before first paint so the page never flashes the wrong one.
-    (function () {
-      var dark = false;
-      try {
-        var saved = localStorage.getItem('intuneRbacDarkMode');
-        dark = saved !== null ? saved === '1' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-      } catch (e) {}
-      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-    })();
-  </script>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -157,8 +146,8 @@
   <div id="comparison-render"></div>
 
   <!-- ── Scripts ── -->
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="vendor/html2canvas.min.js"></script>
   <script src="permissions.js"></script>
   <script src="export-excel.js"></script>
   <script src="export-image.js"></script>

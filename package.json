@@ -1,0 +1,56 @@
+{
+  "name": "intune-rbac-designer",
+  "productName": "Intune RBAC Designer",
+  "version": "1.0.0",
+  "description": "Design and document Microsoft Intune custom RBAC roles",
+  "homepage": "https://github.com/Michael-Civitillo/intune-rbac-designer",
+  "author": "Michael Civitillo",
+  "license": "MIT",
+  "private": true,
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable --x64 --publish never",
+    "smoke": "node scripts/smoke-test.js"
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0",
+    "playwright-core": "1.65.1"
+  },
+  "build": {
+    "appId": "io.github.michael-civitillo.intune-rbac-designer",
+    "productName": "Intune RBAC Designer",
+    "copyright": "Copyright © 2026 Michael Civitillo",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "styles.css",
+      "app.js",
+      "permissions.js",
+      "export-excel.js",
+      "export-image.js",
+      "vendor/**",
+      "desktop/**",
+      "LICENSE"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "Intune-RBAC-Designer-${version}-win-x64.${ext}",
+      "splashImage": "build/splash.bmp"
+    }
+  }
+}
