@@ -14,23 +14,29 @@ Built for Intune admins who need to think through role permissions before commit
 
 **Design roles visually** — Browse all 53 Intune permission categories (pulled from Microsoft Learn), check off the exact permissions each role needs, and see a live count as you go.
 
-**Organize with folders** — Group roles by team (Windows, macOS, Mobile, Security, etc.). Drag roles between folders or drop them into "No Folder" to reorganize on the fly.
+**Organize with folders** — Group roles by team (Windows, macOS, Mobile, Security, etc.). Drag roles between folders or drop them into "No Folder" to reorganize on the fly. Hover a folder to add a role to it, rename it, or delete it.
 
-**Hover for descriptions** — Hover any permission to see its full Microsoft description in a tooltip without leaving the screen.
+**Descriptions right in the list** — Every permission shows Microsoft's description under its name, and clicking anywhere on a row ticks it. Long descriptions fold to three lines with a **Show more**. Prefer a denser list? Switch **Descriptions** off and hover a permission to read its description in a tooltip instead.
 
-**Role summary** — Hit **Summary** on any role to get a quick overview: how many permissions selected, which categories, and a full breakdown.
+**Search and filter** — Search matches permission names, descriptions and category names, highlights what it found, and opens the matching categories for you. Press `/` to jump to the search box and `Esc` to clear it. Switch from **All** to **Selected** to review just what a role grants.
+
+**Role summary** — Hit **Summary** on any role to get a quick overview: how many permissions are selected, how many categories they span, how many are high impact, and a full breakdown.
 
 **Clone roles** — Duplicate an existing role as a starting point instead of building from scratch.
+
+**Undo instead of "Are you sure?"** — Deleting a role or folder happens straight away, with an **Undo** button in the notification that puts it back exactly where it was.
 
 **Export to Excel** — One workbook, one sheet per role, plus a summary sheet. Selected permissions are highlighted green. Ready to share with your team or attach to a change request.
 
 **Export comparison image** — Generate a side-by-side PNG of all roles showing which permissions each one has selected. Useful for reviews and documentation.
 
-**Resizable sidebar** — Drag the right edge of the sidebar to make the role column wider or narrower. Long role names and folder names display in full at whatever width you choose. The width is remembered between sessions.
+**Resizable sidebar** — Drag the right edge of the sidebar to make the role column wider or narrower. Long role names and folder names display in full at whatever width you choose. The width is remembered between sessions; double-click the edge to reset it.
 
-**High-impact permission guardrail** — When you grant a high-impact permission like *Wipe*, *Retire*, *Reset passcode*, or *Delete* on managed devices, or either Remote Help *unattended control* permission, the app asks you to confirm before it's added. If you're sure you want to keep moving fast, tick "Don't show this warning again in this window" and the prompt is suppressed for the rest of the session.
+**High-impact permission guardrail** — Permissions like *Wipe*, *Retire*, *Reset passcode*, *Delete* on managed devices, and both Remote Help *unattended control* permissions carry a **High impact** badge. When you grant one, the app asks you to confirm before it's added. If you're sure you want to keep moving fast, tick "Don't show this warning again in this window" and the prompt is suppressed for the rest of the session.
 
 **Dark mode** — Follows your system preference and can be toggled manually.
+
+**Keyboard and small screens** — Roles, folders, categories and checkboxes are all reachable from the keyboard. On a narrow window the role list tucks into a slide-out panel.
 
 **Persists locally** — Everything saves to `localStorage` automatically. Your roles are there next time you open the file.
 
