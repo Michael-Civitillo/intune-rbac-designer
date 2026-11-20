@@ -28,7 +28,7 @@ Built for Intune admins who need to think through role permissions before commit
 
 **Resizable sidebar** — Drag the right edge of the sidebar to make the role column wider or narrower. Long role names and folder names display in full at whatever width you choose. The width is remembered between sessions.
 
-**Destructive-permission guardrail** — When you grant a high-impact permission like *Wipe*, *Retire*, *Reset passcode*, or *Delete* on managed devices, the app asks you to confirm before it's added. If you're sure you want to keep moving fast, tick "Don't show this warning again in this window" and the prompt is suppressed for the rest of the session.
+**High-impact permission guardrail** — When you grant a high-impact permission like *Wipe*, *Retire*, *Reset passcode*, or *Delete* on managed devices, or either Remote Help *unattended control* permission, the app asks you to confirm before it's added. If you're sure you want to keep moving fast, tick "Don't show this warning again in this window" and the prompt is suppressed for the rest of the session.
 
 **Dark mode** — Follows your system preference and can be toggled manually.
 
@@ -91,6 +91,8 @@ The `permissions.js` file contains all Intune custom role permission scopes pull
 - **Android Enterprise** — *Enrollment time device membership assignment* is now *Enrollment time device membership assignment for Android Enterprise*.
 - **Remote Help app** — new *Windows unattended control remote sign-in* permission (2608).
 - **Remote Help app** — *Unattended control* is now *Android unattended control*.
+
+Permission names and descriptions are Microsoft's wording, so what you see here is what you'll look for in the Intune admin center. That includes a few quirks in *Remote tasks*, such as the trailing period on *Sync devices.* and *Get FileVault key.*
 
 If Microsoft adds new permissions in a future update, edit `permissions.js` to add them — the rest of the app picks them up automatically. If Microsoft renames one, add it to `PERMISSION_RENAMES` at the bottom of the same file: roles saved under the old name are carried over to the new one the next time the app loads.
 

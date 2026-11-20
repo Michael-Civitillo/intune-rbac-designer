@@ -1,14 +1,15 @@
-// Intune custom role permissions.
+// Intune custom role permissions. Category names, permission names and descriptions
+// are Microsoft's own wording, including the trailing periods on a few Remote tasks names.
 // Source: https://learn.microsoft.com/intune/fundamentals/role-based-access-control/create-custom-role
 // Last synced: 2026-11-20 (Learn page revision of 2026-11-12, Intune service release 2611).
 const PERMISSIONS_DATA = [
   {
     category: "Admin tasks",
     permissions: [
-      { action: "Create", description: "Allows creation of new device management administrative tasks" },
-      { action: "Delete", description: "Allows deletion of device management administrative tasks" },
-      { action: "Read", description: "Allows read access to device management administrative tasks" },
-      { action: "Update", description: "Allows updating of device management administrative task properties and status" }
+      { action: "Create", description: "Allows creation of new device management administrative tasks." },
+      { action: "Delete", description: "Allows deletion of device management administrative tasks." },
+      { action: "Read", description: "Allows read access to device management administrative tasks." },
+      { action: "Update", description: "Allows updating of device management administrative task properties and status." }
     ]
   },
   {
@@ -94,10 +95,10 @@ const PERMISSIONS_DATA = [
   {
     category: "Cloud PKI",
     permissions: [
-      { action: "Create certificate authorities (CAs)", description: "Create certificate authorities (CAs)" },
-      { action: "Disable and reenable CAs", description: "Disable and reenable CAs" },
-      { action: "Read CAs", description: "Read CAs and the leaf certificates issued by them" },
-      { action: "Revoke issued leaf certificates", description: "Revoke issued leaf certificates" }
+      { action: "Create certificate authorities (CAs)", description: "Create certificate authorities (CAs)." },
+      { action: "Disable and reenable CAs", description: "Disable and reenable CAs." },
+      { action: "Read CAs", description: "Read CAs and the leaf certificates issued by them." },
+      { action: "Revoke issued leaf certificates", description: "Revoke issued leaf certificates." }
     ]
   },
   {
@@ -122,10 +123,10 @@ const PERMISSIONS_DATA = [
   {
     category: "Deployment Plans",
     permissions: [
-      { action: "Create", description: "Create Deployment Plans" },
-      { action: "Delete", description: "Delete Deployment Plans" },
-      { action: "Read", description: "Read Deployment Plans" },
-      { action: "Update", description: "Update Deployment Plans" }
+      { action: "Create", description: "Create Deployment Plans." },
+      { action: "Delete", description: "Delete Deployment Plans." },
+      { action: "Read", description: "Read Deployment Plans." },
+      { action: "Update", description: "Update Deployment Plans." }
     ]
   },
   {
@@ -234,10 +235,10 @@ const PERMISSIONS_DATA = [
   {
     category: "Filters",
     permissions: [
-      { action: "Create", description: "Create new filters for targeting policies and apps to specific devices." },
-      { action: "Delete", description: "Delete filters." },
-      { action: "Read", description: "View filters." },
-      { action: "Update", description: "Edit filters." }
+      { action: "Create", description: "Create new filter. Learn more https://go.microsoft.com/fwlink/?linkid=2135625" },
+      { action: "Delete", description: "Delete filters. Learn more https://go.microsoft.com/fwlink/?linkid=2135625" },
+      { action: "Read", description: "View filters. Learn more https://go.microsoft.com/fwlink/?linkid=2135625" },
+      { action: "Update", description: "Edit filters. Learn more https://go.microsoft.com/fwlink/?linkid=2135625" }
     ]
   },
   {
@@ -305,20 +306,20 @@ const PERMISSIONS_DATA = [
     category: "Microsoft Tunnel Gateway",
     permissions: [
       { action: "Create", description: "Create Microsoft Tunnel Gateway server configurations and sites. Server configurations include settings for IP address ranges, DNS servers, ports, and split tunneling rules. Sites are logical groupings of multiple servers that support Microsoft Tunnel." },
-      { action: "Delete", description: "Delete Microsoft Tunnel Gateway server configurations and sites." },
-      { action: "Read", description: "View Microsoft Tunnel Gateway server configurations and sites." },
-      { action: "Update", description: "Update Microsoft Tunnel Gateway server configurations and sites." }
+      { action: "Delete", description: "Delete Microsoft Tunnel Gateway server configurations and sites. Server configurations include settings for IP address ranges, DNS servers, ports, and split tunneling rules. Sites are logical groupings of multiple servers that support Microsoft Tunnel." },
+      { action: "Read", description: "View Microsoft Tunnel Gateway server configurations and sites. Server configurations include settings for IP address ranges, DNS servers, ports, and split tunneling rules. Sites are logical groupings of multiple servers that support Microsoft Tunnel." },
+      { action: "Update", description: "Update Microsoft Tunnel Gateway server configurations and sites. Server configurations include settings for IP address ranges, DNS servers, ports, and split tunneling rules. Sites are logical groupings of multiple servers that support Microsoft Tunnel." }
     ]
   },
   {
     category: "Mobile apps",
     permissions: [
       { action: "Assign", description: "Assign mobile applications or eBooks to Microsoft Entra security groups." },
-      { action: "Create", description: "Add new mobile applications to Intune such as store apps, line-of-business apps, web-links, or built-in apps. You can also add books purchased through the Apple Volume Purchase Program or add eBook categories." },
-      { action: "Delete", description: "Delete mobile applications such as store apps, line-of-business apps, web-links, or built-in apps. You can also delete books purchased through the Apple Volume Purchase Program or delete eBook categories." },
-      { action: "Read", description: "View mobile applications such as store apps, line-of-business apps, web-links, or built-in apps. You can also view books purchased through the Apple Volume Purchase Program." },
+      { action: "Create", description: "Add new mobile applications to Intune such as store apps, line-of-business apps, web-links, or built-in apps. You can also add books purchased through the Apple Volume Purchase Program or add eBook categories. You can set up iOS VPP Tokens, Windows Symantec certificates, Windows side loading keys, app categories, or the Android for Work connection. Note: You can view and manage Apple Volume Purchase Program (VPP) apps with only the Mobile apps permission assigned. Previously, the Managed apps permission was required to view and manage VPP apps. This change doesn't apply to Intune for Education tenants who still need to assign the Managed apps permission." },
+      { action: "Delete", description: "Delete mobile applications such as store apps, line-of-business apps, web-links, or built-in apps. You can also delete books purchased through the Apple Volume Purchase Program or delete eBook categories. You can delete iOS VPP Tokens, Windows Symantec certificates, Windows side loading keys, app categories, or the Android for Work connection. Note: You can view and manage Apple Volume Purchase Program (VPP) apps with only the Mobile apps permission assigned. Previously, the Managed apps permission was required to view and manage VPP apps. This change doesn't apply to Intune for Education tenants who still need to assign the Managed apps permission." },
+      { action: "Read", description: "View mobile applications such as store apps, line-of-business apps, web-links, or built-in apps. You can also view books purchased through the Apple Volume Purchase Program or add eBook categories. You can view iOS VPP Tokens, Windows Symantec certificates, Windows side loading keys, app categories, or the Android for Work connection. Note: You can view and manage Apple Volume Purchase Program (VPP) apps with only the Mobile apps permission assigned. Previously, the Managed apps permission was required to view and manage VPP apps. This change doesn't apply to Intune for Education tenants who still need to assign the Managed apps permission." },
       { action: "Relate", description: "Create relationships with other managed apps using Dependencies and Supersedence features." },
-      { action: "Update", description: "Manage mobile applications such as store apps, line-of-business apps, web-links, or built-in apps. The Mobile Applications Create permission may be required for certain application update scenarios." }
+      { action: "Update", description: "Manage mobile applications such as store apps, line-of-business apps, web-links, or built-in apps. You can also manage books purchased through the Apple Volume Purchase Program or add eBook categories. You can manage iOS VPP Tokens, Windows Symantec certificates, Windows side loading keys, app categories, or the Android for Work connection. The Mobile Applications Create permission may be required for certain application update scenarios. Note: You can view and manage Apple Volume Purchase Program (VPP) apps with only the Mobile apps permission assigned. Previously, the Managed apps permission was required to view and manage VPP apps. This change doesn't apply to Intune for Education tenants who still need to assign the Managed apps permission." }
     ]
   },
   {
@@ -400,7 +401,7 @@ const PERMISSIONS_DATA = [
     category: "Remote assistance connectors",
     permissions: [
       { action: "Read", description: "View the status of the TeamViewer connector and remote help. This permission isn't required to initiate remote assistance requests for devices." },
-      { action: "Update", description: "Manage the state of the TeamViewer connector and remote help. This permission also requires the Remote assistance connectors > Read permission." },
+      { action: "Update", description: "Manage the state of the TeamViewer connector and remote help. This permission also requires the Remote assistance connectors > Read permission to view the status of the TeamViewer connector and remote help." },
       { action: "View reports", description: "View, generate and export remote help sessions and monitor reports." }
     ]
   },
@@ -417,15 +418,15 @@ const PERMISSIONS_DATA = [
   {
     category: "Remote tasks",
     permissions: [
-      { action: "Bypass activation lock", description: "Remove the Activation Lock from supervised devices without requiring the user's Apple ID and password. This may be required if a user leaves the company and returns the device." },
-      { action: "Change assignments", description: "Allows IT Admin to initiate a change assignments action. Action allows the selection of assigned applications and configuration to be removed from a device." },
+      { action: "Bypass activation lock", description: "Remove the Activation Lock from supervised devices without requiring the user's Apple ID and password. This may be required if a user leaves the company and returns the device; without the user's Apple ID and password, there's no way to reactivate the device. Or, you need to reassign some devices to a different department during a device refresh in your organization. You can only reassign devices that don't have Activation Lock enabled. You must also have the Managed Device > Read permission to view devices in the Azure portal before initiating this remote task." },
+      { action: "Change assignments", description: "Allows IT Admin to initiate a change assignments action. Action allows the selection of assigned applications and configuration to be removed from a device. Additionally, previously removed applications and configuration to be restored on the device." },
       { action: "Clean PC", description: "Initiate a Fresh start device action. This action removes any apps that are installed on a Windows 10 PC that's running the Creators Update. Then, it automatically updates the PC to the latest version of Windows." },
       { action: "Collect diagnostics", description: "Collect device diagnostics." },
       { action: "Disable lost mode", description: "Turn off lost mode for an iOS or ChromeOS device." },
       { action: "Enable lost mode", description: "Initiate lost mode on lost or stolen iOS or ChromeOS devices. This mode lets you enter a message and a phone number that appears on the lock screen of the device. To use lost mode, the device must be a corporate-owned iOS device that is in supervised mode." },
       { action: "Enable Windows IntuneAgent", description: "Enable Windows Intune agent." },
-      { action: "Get FileVault key", description: "Get Mac FileVault key." },
-      { action: "Initiate MDM attestation", description: "Indicates remote device action to initiate Mobile Device Management (MDM) attestation if device is capable for it." },
+      { action: "Get FileVault key.", description: "Get Mac FileVault key." },
+      { action: "Indicates remote device action to initiate Mobile Device Management (MDM) attestation if device is capable for it.", description: "Indicates remote device action to initiate Mobile Device Management (MDM) attestation if device is capable for it." },
       { action: "Initiate Configuration Manager action", description: "Initiate a remote action on a device managed by Configuration Manager." },
       { action: "Locate device", description: "View the location of a lost or stolen corporate-owned device on a map. Can locate supervised iOS/iPadOS devices, Android dedicated devices (COSU), and Windows devices." },
       { action: "Manage shared device users", description: "Sign out the user with the current session on a shared device. This action doesn't delete users from a shared device, it only forces the user with a current session to be logged out." },
@@ -434,14 +435,14 @@ const PERMISSIONS_DATA = [
       { action: "Play sound to locate lost devices", description: "Play a sound to locate lost Android dedicated devices, or iOS devices placed in MDM lost mode." },
       { action: "Reboot now", description: "Initiates a device restart. This causes the device you choose to be restarted. The device owner isn't automatically notified of the restart, and they might lose work." },
       { action: "Recover MDM Key", description: "Initiate Mobile Device Management (MDM) certificate's private key recovery with TPM attestation." },
-      { action: "Remote lock", description: "The Remote lock device action locks the device. To unlock the device, the device owner enters their passcode. You can remotely lock devices that have a PIN or password set." },
-      { action: "Remove Device Firmware Configuration Interface Management", description: "Allows admin to initiate removal of device from Device Firmware Configuration Interface management before deleting the Intune and Autopilot records." },
-      { action: "Reset passcode", description: "Initiates a forced removal of the passcode, and requires the device user to set a new passcode. Supported on iOS devices, and certain later versions of Android and Android for work." },
-      { action: "Restore Managed Home Screen", description: "Manually restore Managed Home Screen on Android Enterprise devices to return them to kiosk mode from a temporarily suspended state." },
-      { action: "Retire", description: "Initiates a retire action for a device. The Remove company data action removes managed app data (where applicable), settings, and email profiles that were assigned by using Intune. The device is removed from Intune management." },
+      { action: "Remote lock", description: "The Remote lock device action locks the device. To unlock the device, the device owner enters their passcode. You can remotely lock devices that have a PIN or password set. Devices that don't have a PIN or password can't be remotely locked." },
+      { action: "Remove Device Firmware Configuration Interface Management.", description: "Allows admin to initiate removal of device from Device Firmware Configuration Interface management before deleting the Intune and Autopilot records." },
+      { action: "Reset passcode", description: "Initiates a forced removal of the passcode, and requires the device user to set a new passcode. Supported on iOS devices, and certain later versions of Android and Android for work. Not supported on older Android versions, macOS, or Windows." },
+      { action: "Restore Managed Home Screen", description: "Manually restore Managed Home Screen on Android Enterprise devices to return them to kiosk mode from a temporarily suspended state. Complements the temporary suspend action for complete kiosk mode management." },
+      { action: "Retire", description: "Initiates a retire action for a device. Also called remove company data. The Remove company data action removes managed app data (where applicable), settings, and email profiles that were assigned by using Intune. The device is removed from Intune management. This happens the next time the device checks in and receives the remote Remove company data action. Remove company data leaves the user's personal data on the device. For ChromeOS devices, this starts a deprovision action." },
       { action: "Revoke App Licenses", description: "Revokes any iOS VPP application licenses that have been associated with the device." },
       { action: "Rotate BitLockerKeys (preview)", description: "Initiates a key rotation for BitLocker Recovery Passwords on the device." },
-      { action: "Rotate FileVault key", description: "Rotate Mac FileVault key." },
+      { action: "Rotate FileVault key.", description: "Rotate Mac FileVault key." },
       { action: "Rotate Local Admin Password", description: "Initiates a manual rotation for the local admin password on the device." },
       { action: "Rotate macOS recovery lock password", description: "Rotate the recovery lock password for macOS devices." },
       { action: "Run Pause Configuration Refresh", description: "Initiate On Demand pause configuration refresh." },
@@ -449,13 +450,13 @@ const PERMISSIONS_DATA = [
       { action: "Send custom notifications", description: "Allows admin to send customized notifications to devices. Devices receive notifications in Company Portal." },
       { action: "Set device name", description: "Set or change the name of a device." },
       { action: "Shut down", description: "Initiates a shutdown of the device, and will automatically close all applications and running services and leave the device in a powered-off state." },
-      { action: "Sync devices", description: "Initiates a sync operation on the device and forces the selected device to immediately check in with Intune. When a device checks in, it immediately receives any pending actions or policies that have been assigned to it." },
-      { action: "Temporarily suspend Managed Home Screen", description: "Remotely suspend Managed Home Screen on Android Enterprise devices in kiosk mode, allowing temporary access to the default launcher experience." },
+      { action: "Sync devices.", description: "Initiates a sync operation on the device and forces the selected device to immediately check in with Intune. When a device checks in, it immediately receives any pending actions or policies that have been assigned to it." },
+      { action: "Temporarily suspend Managed Home Screen", description: "Remotely suspend Managed Home Screen on Android Enterprise devices in kiosk mode, allowing temporary access to the default launcher experience. Supports automatic restoration after a configured time period without requiring user interaction or PIN sharing." },
       { action: "Update cellular data plan", description: "Activate the data plan for cellular iOS/iPadOS devices that support eSIM." },
       { action: "Update device account", description: "Allows changing the device account associated with Surface Hub devices, and set authentication options such as password rotation." },
       { action: "View macOS recovery lock password", description: "View the recovery lock password in the Recovery Keys blade of macOS devices." },
       { action: "Windows Defender", description: "Initiates a Windows Defender signature update." },
-      { action: "Wipe", description: "Initiates a wipe of the device. Also called a factory reset. The Factory reset action restores a device to its factory default settings. The user data is kept or wiped depending on whether or not you choose the Retain enrollment state and user account checkbox." }
+      { action: "Wipe", description: "Initiates a wipe of the device. Also called a \"factory reset.\" The Factory reset action restores a device to its factory default settings. The user data is kept or wiped depending on whether or not you choose the Retain enrollment state and user account checkbox. For ChromeOS devices, this starts either a wipe or a factory reset (Powerwash) action." }
     ]
   },
   {
@@ -495,8 +496,8 @@ const PERMISSIONS_DATA = [
   {
     category: "Telecom expenses",
     permissions: [
-      { action: "Read", description: "View settings and status of telecom expense partner connector. Note: this feature was deprecated and this permission is no longer supported after June 2025." },
-      { action: "Update", description: "Modify or activate telecom expense management partner connector. Note: this feature is deprecated and no longer supported after June 2025." }
+      { action: "Read", description: "View settings and status of telecom expense partner connector. The telecom expense partner connector feature was deprecated and this permission is no longer supported after June 2025." },
+      { action: "Update", description: "Modify or activate telecom expense management partner connector. The telecom expense partner connector feature is deprecated and this permission is no longer supported after June, 2025." }
     ]
   },
   {
@@ -524,9 +525,16 @@ const PERMISSIONS_DATA = [
   }
 ];
 
-// Permissions Microsoft has renamed. Roles saved under the old name are moved to
-// the new one on load, so a rename never silently drops a selection.
+// Old permission names and what they are called now. Roles saved under an old name
+// are moved to the new one on load, so a rename never silently drops a selection.
 const PERMISSION_RENAMES = [
+  // Renamed by Microsoft
   { category: "Android Enterprise", from: "Enrollment time device membership assignment", to: "Enrollment time device membership assignment for Android Enterprise" },
-  { category: "Remote Help app", from: "Unattended control", to: "Android unattended control" }
+  { category: "Remote Help app", from: "Unattended control", to: "Android unattended control" },
+  // Shortened by earlier versions of this app; now spelled the way Microsoft lists them
+  { category: "Remote tasks", from: "Get FileVault key", to: "Get FileVault key." },
+  { category: "Remote tasks", from: "Initiate MDM attestation", to: "Indicates remote device action to initiate Mobile Device Management (MDM) attestation if device is capable for it." },
+  { category: "Remote tasks", from: "Remove Device Firmware Configuration Interface Management", to: "Remove Device Firmware Configuration Interface Management." },
+  { category: "Remote tasks", from: "Rotate FileVault key", to: "Rotate FileVault key." },
+  { category: "Remote tasks", from: "Sync devices", to: "Sync devices." }
 ];

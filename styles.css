@@ -32,6 +32,9 @@
 
   /* Fixed */
   --white: #ffffff;
+  --gray-200: #e5e7eb;
+  --gray-500: #6b7280;
+  --gray-900: #111827;   /* tooltip + toast background */
   --sidebar-width: 240px;
   --header-height: 56px;
   --border-radius: 6px;
@@ -62,6 +65,8 @@
   --blue-light:   #0c2340;
   --green-light:  #0d2e1a;
   --red-light:    #2e1217;
+  --gray-200:     #2a3441;
+  --gray-900:     #2a3441;   /* lifted so tooltips and toasts stand off the dark surface */
 
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.5);

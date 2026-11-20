@@ -44,7 +44,7 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-// Carry selections across permissions Microsoft has renamed (see PERMISSION_RENAMES)
+// Carry selections across renamed permissions (see PERMISSION_RENAMES)
 function migratePermissions(keys) {
   const perms = new Set(keys);
   PERMISSION_RENAMES.forEach(({ category, from, to }) => {
@@ -91,9 +91,11 @@ function hideTooltip()        { tooltip.classList.remove('visible'); }
 function positionTooltip(e) {
   const pad = 12, tw = 320;
   let x = e.clientX + pad, y = e.clientY + pad;
-  if (x + tw > window.innerWidth)  x = e.clientX - tw - pad;
-  if (y + 120 > window.innerHeight) y = e.clientY - 120 - pad;
+  if (x + tw > window.innerWidth)  x = Math.max(pad, e.clientX - tw - pad);
   tooltip.style.left = x + 'px';
+  // Descriptions vary a lot in length, so measure the real height before placing vertically
+  const th = tooltip.offsetHeight;
+  if (y + th > window.innerHeight) y = Math.max(pad, e.clientY - th - pad);
   tooltip.style.top  = y + 'px';
 }
 
@@ -240,6 +242,10 @@ const DESTRUCTIVE_PERMISSIONS = new Set([
   permKey('Remote tasks',     'Retire'),
   permKey('Remote tasks',     'Reset passcode'),
   permKey('Remote tasks',     'Disable lost mode'),
+  // Not destructive, but they let a helper into a device with nobody at it. Microsoft's
+  // guidance is to grant these explicitly, in a dedicated role scoped to specific devices.
+  permKey('Remote Help app',  'Android unattended control'),
+  permKey('Remote Help app',  'Windows unattended control remote sign-in'),
 ]);
 
 let suppressDestructiveWarnings = false;
