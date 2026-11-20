@@ -11,7 +11,7 @@ Built for Intune admins who need to think through role permissions before commit
 
 Good to know:
 
-- **First start takes a few seconds.** The exe is a single portable file that unpacks itself each time it starts; a small "Starting…" window shows while it does.
+- **Starting takes 10–15 seconds.** The exe is a single portable file that unpacks itself each time it starts; a small "Starting…" window shows while it does.
 - **Windows may warn you.** The app isn't code signed, so SmartScreen can show "Windows protected your PC". Choose **More info**, then **Run anyway**. Some organizations block unsigned apps entirely; if yours does, use the browser version below.
 - **Your work is kept.** Roles are saved on your PC (under `%APPDATA%\Intune RBAC Designer`) and are there the next time you open the app, even if you move or re-download the exe.
 - **Exports go to Downloads**, and the file is highlighted in Explorer when it's ready.

@@ -111,7 +111,7 @@ jobs:
           1. Download **Intune-RBAC-Designer-${version}-win-x64.exe** below.
           2. Double-click it. There is nothing to install and no admin rights are needed.
 
-          The first start takes a few seconds while the app unpacks itself.
+          Starting takes 10-15 seconds, because the app unpacks itself each time. A small "Starting" window shows while it does.
 
           Windows may show a blue "Windows protected your PC" prompt because the app is not code signed.
           Choose **More info**, then **Run anyway**.
