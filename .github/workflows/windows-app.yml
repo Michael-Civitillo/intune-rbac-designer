@@ -1,7 +1,12 @@
 name: Windows app
 
 # Builds the portable Windows exe on every push so there is always a tested build to download
-# from the run's Artifacts. Pushing a tag like v1.2.0 also publishes it as a GitHub release.
+# from the run's Artifacts.
+#
+# To publish a release, either:
+#   - open this workflow on the Actions tab, choose "Run workflow" and enter a version, or
+#   - push a tag like v1.2.0.
+# Both build, test and then publish the exe as a GitHub release with that version.
 
 on:
   push:
@@ -9,6 +14,11 @@ on:
     tags: ['v*']
     paths-ignore: ['docs/**', '**.md']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish as a release, for example 1.2.0. Leave empty for a test build only.'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -22,6 +32,8 @@ jobs:
     name: Build and test
     runs-on: windows-latest
     timeout-minutes: 30
+    outputs:
+      version: ${{ steps.release.outputs.version }}
     steps:
       - uses: actions/checkout@v6
 
@@ -33,11 +45,30 @@ jobs:
       - name: Install build tools
         run: npm ci
 
-      # A release takes its version from the tag, so tagging is the only step needed to ship one
-      - name: Use the tag as the version
-        if: startsWith(github.ref, 'refs/tags/v')
+      # A release takes its version from the "Run workflow" box or from the tag.
+      # Ordinary pushes have neither, and only produce a test build.
+      - name: Work out the release version
+        id: release
         shell: bash
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          version=""
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
+          if [[ -n "$REQUESTED" ]]; then version="${REQUESTED#v}"; fi
+          if [[ -n "$version" && ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$version' is not a version number like 1.2.0"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Release version: ${version:-none, this is a test build}"
+
+      - name: Set the app version
+        if: steps.release.outputs.version != ''
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Build the portable exe
         run: npm run dist
@@ -82,7 +113,7 @@ jobs:
           if-no-files-found: error
 
   # Runs no code from the repository: it only takes the tested build from the job above.
-  # On a normal push it stops after fetching the build; on a version tag it publishes it.
+  # For a test build it stops after fetching it; for a release it publishes it.
   release:
     name: Publish release
     needs: build
@@ -100,15 +131,16 @@ jobs:
         run: ls -l release && cat release/SHA256SUMS.txt
 
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: needs.build.outputs.version != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          tag="v${VERSION}"
           cat > notes.md <<EOF
           ## How to use it
 
-          1. Download **Intune-RBAC-Designer-${version}-win-x64.exe** below.
+          1. Download **Intune-RBAC-Designer-${VERSION}-win-x64.exe** below.
           2. Double-click it. There is nothing to install and no admin rights are needed.
 
           Starting takes 10-15 seconds, because the app unpacks itself each time. A small "Starting" window shows while it does.
@@ -119,8 +151,17 @@ jobs:
           Your roles are saved on your PC and are still there the next time you open the app.
           Exports are saved to your Downloads folder.
           EOF
-          gh release create "$GITHUB_REF_NAME" release/*.exe release/SHA256SUMS.txt \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Intune RBAC Designer ${version}" \
-            --notes-file notes.md \
-            --generate-notes
+
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            # A release for this tag already exists (for example one drafted on github.com):
+            # add the tested files to it rather than failing.
+            gh release upload "$tag" release/*.exe release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            # Creates the tag at this commit if it does not exist yet
+            gh release create "$tag" release/*.exe release/SHA256SUMS.txt \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Intune RBAC Designer ${VERSION}" \
+              --notes-file notes.md \
+              --generate-notes
+          fi

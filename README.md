@@ -106,11 +106,16 @@ The only dependencies are SheetJS and html2canvas. Both are checked in under `ve
 
 The exe is the same page wrapped in [Electron](https://www.electronjs.org/). You don't need to build it yourself: GitHub Actions does it on every push (`.github/workflows/windows-app.yml`), tests the result on a real Windows machine, and attaches the exe to the run under **Artifacts**.
 
-**To publish a release**, push a version tag. The build takes its version number from the tag and the exe is attached to a new GitHub release:
+**To publish a release**, no git is needed:
+
+1. On GitHub, open **Actions → Windows app → Run workflow**.
+2. Type the version, for example `1.1.0`, and run it.
+
+A few minutes later the tested exe and its checksum are on a new release page, tagged `v1.1.0`. Pushing a tag does the same thing, if you prefer:
 
 ```
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
 To build locally on Windows instead (Node.js 22 or newer):
