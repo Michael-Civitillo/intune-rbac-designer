@@ -800,6 +800,7 @@ kbd {
 
 .role-group-select {
   max-width: 220px;
+  field-sizing: content;   /* as wide as the chosen folder's name, not the longest one */
   padding: 2px 0;
   font-size: 13px;
   font-weight: 500;
