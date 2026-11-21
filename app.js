@@ -1,9 +1,14 @@
 // ── State ─────────────────────────────────────────────────────────────────────
-let roles             = [];   // [{ id, name, groupId, permissions: Set<string> }]
+// A role looks like:
+//   { id, name, groupId, permissions: Set<permKey>, description, notes: { permKey: text },
+//     assignments: [{ id, name, description, adminGroups, scopeGroups, scopeTags }],
+//     reviewed: 'YYYY-MM-DD' }   // the permission list revision it was last reviewed against
+let roles             = [];
 let groups            = [];   // [{ id, name, collapsed }]
 let activeRoleId      = null;
 let searchQuery       = '';
-let filterMode        = 'all'; // 'all' | 'selected'
+let filterMode        = 'all';         // 'all' | 'selected' | 'new'
+let editorTab         = 'permissions'; // 'permissions' | 'assignments'
 let showDescriptions  = true;
 let toastTimer        = null;
 let dragState         = null; // { roleId, ghost, sourceEl }
@@ -12,6 +17,7 @@ let suppressNextClick = false; // eat the click that follows a completed drag
 const STORAGE_KEY   = 'intuneRbacRoles';
 const DARK_MODE_KEY = 'intuneRbacDarkMode';
 const SHOW_DESC_KEY = 'intuneRbacShowDescriptions';
+const SAVE_VERSION  = 3;
 
 const TOTAL_PERMISSIONS = PERMISSIONS_DATA.reduce((n, c) => n + c.permissions.length, 0);
 const CLAMP_FROM        = 130; // characters; anything shorter never needs more than three lines
@@ -25,20 +31,30 @@ const ICON = {
   chevron: '<polyline points="6 9 12 15 18 9"/>',
   search:  '<circle cx="11" cy="11" r="7"/><line x1="20.5" y1="20.5" x2="16.2" y2="16.2"/>',
   x:       '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  check:   '<polyline points="20 6 9 17 4 12"/>',
   summary: '<rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>',
   copy:    '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>',
   trash:   '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>',
   pencil:  '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>',
   alert:   '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  info:    '<circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
   layers:  '<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>',
   expand:  '<polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/>',
   collapse:'<polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/>',
+  sparkle: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/>',
+  note:    '<path d="M21 15a2 2 0 01-2 2H8l-5 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>',
+  cloud:   '<path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/><polyline points="12 12 12 17"/><polyline points="9.5 14.5 12 12 14.5 14.5"/>',
+  users:   '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>',
+  download:'<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  upload:  '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+  template:'<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
 };
 const FOLDER_ICON = (size = 14, cls = '') =>
   `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M2 6a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function permKey(category, action) { return `${category}||${action}`; }
+function splitKey(key) { const at = key.indexOf('||'); return { category: key.slice(0, at), action: key.slice(at + 2) }; }
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
@@ -82,21 +98,70 @@ function isTypingTarget(el) {
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
 }
 
-// ── Persistence ───────────────────────────────────────────────────────────────
-function saveState() {
-  const data = {
-    version: 2,
-    groups,
-    roles: roles.map(r => ({
-      id: r.id, name: r.name,
-      groupId: r.groupId || null,
-      permissions: Array.from(r.permissions)
-    }))
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+function formatDate(iso) {
+  const d = new Date(`${iso}T00:00:00`);
+  return isNaN(d) ? iso : d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-// Carry selections across renamed permissions (see PERMISSION_RENAMES)
+function todayStamp() { return new Date().toISOString().slice(0, 10); }
+
+// ── Permission catalogue lookups ──────────────────────────────────────────────
+// permKey -> { category, action, description, added? }
+const PERM_INDEX = new Map();
+PERMISSIONS_DATA.forEach(cat => cat.permissions.forEach(p =>
+  PERM_INDEX.set(permKey(cat.category, p.action), { category: cat.category, ...p })));
+
+function getPermDescription(category, action) {
+  return PERM_INDEX.get(permKey(category, action))?.description || '';
+}
+
+function countCategoriesUsed(role) {
+  return PERMISSIONS_DATA.filter(cat =>
+    cat.permissions.some(p => role.permissions.has(permKey(cat.category, p.action)))
+  ).length;
+}
+
+// Permissions Microsoft added to Intune after this role was last reviewed
+function newPermissionKeys(role) {
+  const since = role.reviewed || CATALOG_BASELINE;
+  const keys = [];
+  PERM_INDEX.forEach((perm, key) => { if (perm.added && perm.added > since) keys.push(key); });
+  return keys;
+}
+
+// ── Roles: creating, saving, loading ──────────────────────────────────────────
+function makeRole(fields = {}) {
+  return {
+    id: uid(), name: 'New Role', groupId: null,
+    permissions: new Set(), description: '', notes: {}, assignments: [],
+    reviewed: CATALOG_DATE,
+    ...fields,
+  };
+}
+
+function makeAssignment(fields = {}) {
+  return { id: uid(), name: '', description: '', adminGroups: [], scopeGroups: [], scopeTags: [], ...fields };
+}
+
+function cleanList(list) {
+  return Array.isArray(list) ? [...new Set(list.map(v => String(v).trim()).filter(Boolean))] : [];
+}
+
+function serializeRole(r) {
+  return {
+    id: r.id, name: r.name, groupId: r.groupId || null,
+    permissions: Array.from(r.permissions),
+    description: r.description || '',
+    notes: r.notes || {},
+    assignments: (r.assignments || []).map(a => ({
+      id: a.id, name: a.name || '', description: a.description || '',
+      adminGroups: a.adminGroups || [], scopeGroups: a.scopeGroups || [], scopeTags: a.scopeTags || [],
+    })),
+    reviewed: r.reviewed || CATALOG_BASELINE,
+  };
+}
+
+// Carry selections (and notes) across renamed permissions (see PERMISSION_RENAMES)
 function migratePermissions(keys) {
   const perms = new Set(keys);
   PERMISSION_RENAMES.forEach(({ category, from, to }) => {
@@ -105,19 +170,61 @@ function migratePermissions(keys) {
   return perms;
 }
 
+function migrateNotes(notes) {
+  const out = {};
+  if (!notes || typeof notes !== 'object') return out;
+  Object.entries(notes).forEach(([key, text]) => {
+    if (typeof text === 'string' && text.trim()) out[key] = text;
+  });
+  PERMISSION_RENAMES.forEach(({ category, from, to }) => {
+    const oldKey = permKey(category, from);
+    if (oldKey in out) { out[permKey(category, to)] = out[oldKey]; delete out[oldKey]; }
+  });
+  return out;
+}
+
+// Turns saved data (any version, or an imported file) back into a role.
+// Saves from before `reviewed` existed predate every permission that carries an `added` date.
+function reviveRole(raw) {
+  return makeRole({
+    id: raw.id || uid(),
+    name: typeof raw.name === 'string' ? raw.name : '',
+    groupId: raw.groupId || null,
+    permissions: migratePermissions(Array.isArray(raw.permissions) ? raw.permissions : []),
+    description: typeof raw.description === 'string' ? raw.description : '',
+    notes: migrateNotes(raw.notes),
+    assignments: (Array.isArray(raw.assignments) ? raw.assignments : []).map(a => makeAssignment({
+      id: a.id || uid(),
+      name: typeof a.name === 'string' ? a.name : '',
+      description: typeof a.description === 'string' ? a.description : '',
+      adminGroups: cleanList(a.adminGroups), scopeGroups: cleanList(a.scopeGroups), scopeTags: cleanList(a.scopeTags),
+    })),
+    reviewed: typeof raw.reviewed === 'string' ? raw.reviewed : CATALOG_BASELINE,
+  });
+}
+
+function saveState() {
+  const data = {
+    version: SAVE_VERSION,
+    groups,
+    roles: roles.map(serializeRole),
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
 
-    // Backward-compat: old format was a plain array of roles
+    // Backward-compat: the first format was a plain array of roles
     if (Array.isArray(data)) {
-      roles  = data.map(r => ({ id: r.id, name: r.name, groupId: null, permissions: migratePermissions(r.permissions) }));
+      roles  = data.map(r => reviveRole({ ...r, groupId: null }));
       groups = [];
     } else {
       groups = (data.groups || []).map(g => ({ id: g.id, name: g.name, collapsed: !!g.collapsed }));
-      roles  = (data.roles  || []).map(r => ({ id: r.id, name: r.name, groupId: r.groupId || null, permissions: migratePermissions(r.permissions) }));
+      roles  = (data.roles  || []).map(reviveRole);
     }
 
     if (roles.length > 0) activeRoleId = roles[0].id;
@@ -177,6 +284,145 @@ function positionTooltip(e) {
 
 document.addEventListener('mousemove', e => { if (tooltip.classList.contains('visible')) positionTooltip(e); });
 
+// ── Dialog ────────────────────────────────────────────────────────────────────
+// One reusable dialog. `body` and `footer` are HTML strings; anything carrying `data-close`
+// closes it. Returns the elements so the caller can wire up its own controls.
+let dialogOnClose = null;
+
+function openDialog({ eyebrow = '', title, body = '', footer = '', size = 'md', onClose = null }) {
+  closeMenu();
+  const overlay = document.getElementById('dialog');
+  const box     = document.getElementById('dialog-box');
+  if (overlay.classList.contains('open') && dialogOnClose) dialogOnClose();
+
+  document.getElementById('dialog-eyebrow').textContent = eyebrow;
+  document.getElementById('dialog-eyebrow').hidden = !eyebrow;
+  document.getElementById('dialog-title').textContent = title;
+  const bodyEl   = document.getElementById('dialog-body');
+  const footerEl = document.getElementById('dialog-footer');
+  bodyEl.innerHTML   = body;
+  footerEl.innerHTML = footer || '<button class="btn btn-primary" data-close>Done</button>';
+  bodyEl.scrollTop = 0;
+
+  box.className = `modal modal-${size}`;
+  dialogOnClose = onClose;
+  overlay.classList.add('open');
+  const first = footerEl.querySelector('[data-close]') || document.getElementById('dialog-close');
+  if (first) first.focus();
+  return { box, body: bodyEl, footer: footerEl };
+}
+
+function closeDialog() {
+  const overlay = document.getElementById('dialog');
+  if (!overlay.classList.contains('open')) return;
+  overlay.classList.remove('open');
+  const done = dialogOnClose;
+  dialogOnClose = null;
+  if (done) done();
+}
+
+function isDialogOpen() { return document.getElementById('dialog').classList.contains('open'); }
+
+function initDialog() {
+  const overlay = document.getElementById('dialog');
+  document.getElementById('dialog-close').addEventListener('click', closeDialog);
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay || e.target.closest('[data-close]')) closeDialog();
+  });
+}
+
+// ── Popover menu ──────────────────────────────────────────────────────────────
+// items: [{ label, hint?, icon?, onSelect }]
+let openMenuEl = null;
+
+function closeMenu() {
+  if (!openMenuEl) return;
+  openMenuEl.remove();
+  openMenuEl = null;
+  document.removeEventListener('mousedown', onMenuOutside, true);
+}
+
+function onMenuOutside(e) {
+  if (openMenuEl && !openMenuEl.contains(e.target)) closeMenu();
+}
+
+function openMenu(anchor, items) {
+  closeMenu();
+  const menu = document.createElement('div');
+  menu.className = 'menu';
+  menu.setAttribute('role', 'menu');
+  items.forEach(item => {
+    const btn = document.createElement('button');
+    btn.className = 'menu-item';
+    btn.setAttribute('role', 'menuitem');
+    btn.innerHTML = `${item.icon ? icon(item.icon, 15) : ''}<span class="menu-text"><span class="menu-label">${escHtml(item.label)}</span>${item.hint ? `<span class="menu-hint">${escHtml(item.hint)}</span>` : ''}</span>`;
+    btn.addEventListener('click', () => { closeMenu(); item.onSelect(); });
+    menu.appendChild(btn);
+  });
+  menu.addEventListener('keydown', e => {
+    const buttons = [...menu.querySelectorAll('.menu-item')];
+    const at = buttons.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); buttons[(at + 1) % buttons.length].focus(); }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); buttons[(at - 1 + buttons.length) % buttons.length].focus(); }
+    if (e.key === 'Escape')    { e.preventDefault(); closeMenu(); anchor.focus(); }
+  });
+  document.body.appendChild(menu);
+
+  const a = anchor.getBoundingClientRect();
+  const left = Math.max(8, Math.min(a.left, window.innerWidth - menu.offsetWidth - 8));
+  const below = a.bottom + 6;
+  const top = below + menu.offsetHeight > window.innerHeight ? Math.max(8, a.top - menu.offsetHeight - 6) : below;
+  menu.style.left = left + 'px';
+  menu.style.top  = top + 'px';
+
+  openMenuEl = menu;
+  menu.querySelector('.menu-item').focus();
+  document.addEventListener('mousedown', onMenuOutside, true);
+}
+
+// ── Files and clipboard ───────────────────────────────────────────────────────
+function downloadFile(filename, text, mime = 'application/json') {
+  const url  = URL.createObjectURL(new Blob([text], { type: mime }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+// Opens the system file picker; resolves with { name, text } or null if nothing was chosen
+function pickFile(accept = '.json,application/json') {
+  return new Promise(resolve => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      if (!file) { resolve(null); return; }
+      resolve({ name: file.name, text: await file.text() });
+    });
+    input.addEventListener('cancel', () => resolve(null));
+    input.click();
+  });
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(area);
+    area.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    area.remove();
+    return ok;
+  }
+}
+
 // ── Small-screen sidebar drawer ───────────────────────────────────────────────
 function openSidebar()  { document.body.classList.add('sidebar-open'); }
 function closeSidebar() { document.body.classList.remove('sidebar-open'); }
@@ -190,6 +436,15 @@ function createGroup(name = 'New Folder') {
   refreshGroupSelect();
   // Trigger inline rename immediately
   setTimeout(() => startRenameGroup(group.id), 30);
+}
+
+// Finds a folder by name, or makes one. Used by imports.
+function ensureGroup(name) {
+  const existing = groups.find(g => g.name.toLowerCase() === name.toLowerCase());
+  if (existing) return existing;
+  const group = { id: uid(), name, collapsed: false };
+  groups.push(group);
+  return group;
 }
 
 function deleteGroup(id) {
@@ -292,23 +547,28 @@ function startRenameGroup(id) {
 }
 
 // ── Role Operations ───────────────────────────────────────────────────────────
-function createRole(name = 'New Role', groupId = null) {
-  const role = { id: uid(), name, groupId, permissions: new Set() };
-  // If a group is specified, insert after last role in that group; otherwise append
-  if (groupId) {
-    const lastIdx = roles.reduce((acc, r, i) => r.groupId === groupId ? i : acc, -1);
-    if (lastIdx >= 0) { roles.splice(lastIdx + 1, 0, role); }
+// Adds a role to the list (after the last role of its folder, if it has one) and opens it
+function addRole(role) {
+  if (role.groupId) {
+    const lastIdx = roles.reduce((acc, r, i) => r.groupId === role.groupId ? i : acc, -1);
+    if (lastIdx >= 0) roles.splice(lastIdx + 1, 0, role);
     else roles.push(role);
   } else {
     roles.push(role);
   }
   activeRoleId = role.id;
-  // A new role has nothing selected and nothing to search for yet — start from the full list
+  // A new role has nothing to search for or filter yet — start from the full list
   searchQuery = '';
   filterMode  = 'all';
+  editorTab   = 'permissions';
   saveState();
   render();
   closeSidebar();
+  return role;
+}
+
+function createRole(name = 'New Role', groupId = null) {
+  const role = addRole(makeRole({ name, groupId }));
   setTimeout(() => {
     const input = document.querySelector('.role-name-input');
     if (input) { input.focus(); input.select(); }
@@ -319,7 +579,17 @@ function createRole(name = 'New Role', groupId = null) {
 function duplicateRole(id) {
   const src = roles.find(r => r.id === id);
   if (!src) return;
-  const copy = { id: uid(), name: `${src.name} (Copy)`, groupId: src.groupId, permissions: new Set(src.permissions) };
+  const copy = makeRole({
+    name: `${src.name} (Copy)`,
+    groupId: src.groupId,
+    permissions: new Set(src.permissions),
+    description: src.description,
+    notes: { ...src.notes },
+    assignments: src.assignments.map(a => makeAssignment({
+      ...a, id: uid(), adminGroups: [...a.adminGroups], scopeGroups: [...a.scopeGroups], scopeTags: [...a.scopeTags],
+    })),
+    reviewed: src.reviewed,
+  });
   const idx = roles.findIndex(r => r.id === id);
   roles.splice(idx + 1, 0, copy);
   activeRoleId = copy.id;
@@ -361,6 +631,24 @@ function selectRole(id) {
   closeSidebar();
 }
 
+// Opens a role with the permission list filtered to `query` (used by "Who has a permission?")
+function showRolePermission(roleId, query) {
+  activeRoleId = roleId;
+  searchQuery  = query;
+  filterMode   = 'all';
+  editorTab    = 'permissions';
+  render();
+  closeSidebar();
+}
+
+function openNewRoleMenu(anchor) {
+  openMenu(anchor, [
+    { label: 'Blank role', hint: 'Start with nothing selected', icon: ICON.plus, onSelect: () => createRole() },
+    { label: 'From a built-in role', hint: "Start from one of Microsoft's roles and trim it", icon: ICON.template, onSelect: () => openBuiltInDialog() },
+    { label: 'Import from a file', hint: 'A backup, or roles exported from Intune', icon: ICON.upload, onSelect: () => openDataDialog() },
+  ]);
+}
+
 // ── Destructive Permission Confirmation ───────────────────────────────────────
 const DESTRUCTIVE_PERMISSIONS = new Set([
   permKey('Managed devices',  'Delete'),
@@ -381,9 +669,8 @@ function isDestructive(category, action) {
   return DESTRUCTIVE_PERMISSIONS.has(permKey(category, action));
 }
 
-function getPermDescription(category, action) {
-  return PERMISSIONS_DATA.find(c => c.category === category)
-    ?.permissions.find(p => p.action === action)?.description || '';
+function highImpactKeys(role) {
+  return [...role.permissions].filter(k => DESTRUCTIVE_PERMISSIONS.has(k));
 }
 
 function confirmDestructive(items) {
@@ -411,17 +698,18 @@ function confirmDestructive(items) {
       btnOk.removeEventListener('click', onOk);
       btnCancel.removeEventListener('click', onCancel);
       modal.removeEventListener('click', onBackdrop);
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey, true);
     }
     function onOk()     { if (dontShow.checked) suppressDestructiveWarnings = true; cleanup(); resolve(true); }
     function onCancel() { cleanup(); resolve(false); }
     function onBackdrop(e) { if (e.target === modal) onCancel(); }
-    function onKey(e)      { if (e.key === 'Escape') onCancel(); }
+    // Capture phase, so Escape answers this prompt and nothing underneath it
+    function onKey(e)      { if (e.key === 'Escape') { e.stopPropagation(); onCancel(); } }
 
     btnOk.addEventListener('click', onOk);
     btnCancel.addEventListener('click', onCancel);
     modal.addEventListener('click', onBackdrop);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true);
     modal.classList.add('open');
     btnCancel.focus();
   });
@@ -434,8 +722,7 @@ function togglePermission(category, action) {
   const key = permKey(category, action);
   role.permissions.has(key) ? role.permissions.delete(key) : role.permissions.add(key);
   saveState();
-  updatePermStats();
-  updateSidebarCount(role);
+  updateRoleIndicators(role);
 }
 
 async function toggleCategory(category) {
@@ -457,73 +744,64 @@ async function toggleCategory(category) {
     allSelected ? role.permissions.delete(key) : role.permissions.add(key);
   });
   saveState();
-  updatePermStats();
-  updateSidebarCount(role);
+  updateRoleIndicators(role);
   renderCategoryCheckboxes(category);
   updateCategoryHeader(category);
 }
 
-// ── Summary Modal ─────────────────────────────────────────────────────────────
-function openSummaryModal(role) {
-  const modal = document.getElementById('summary-modal');
-  document.getElementById('summary-title').textContent = role.name || 'Unnamed role';
-
-  const totalSelected = role.permissions.size;
-  const highImpact    = [...role.permissions].filter(k => DESTRUCTIVE_PERMISSIONS.has(k)).length;
-  const catsUsed      = PERMISSIONS_DATA.filter(cat =>
-    cat.permissions.some(p => role.permissions.has(permKey(cat.category, p.action)))
-  );
-  const group = groups.find(g => g.id === role.groupId);
-
-  document.getElementById('summary-body').innerHTML = `
-    <div class="summary-stats">
-      <div class="stat-card"><div class="stat-num">${totalSelected}</div><div class="stat-label">${totalSelected === 1 ? 'Permission' : 'Permissions'}</div></div>
-      <div class="stat-card"><div class="stat-num">${catsUsed.length}</div><div class="stat-label">${catsUsed.length === 1 ? 'Category' : 'Categories'}</div></div>
-      <div class="stat-card${highImpact ? ' warn' : ''}"><div class="stat-num">${highImpact}</div><div class="stat-label">High impact</div></div>
-    </div>
-    ${group ? `<p class="summary-folder">${FOLDER_ICON(13)} ${escHtml(group.name)}</p>` : ''}
-    ${totalSelected === 0 ? '<p class="summary-empty">No permissions selected for this role yet.</p>' : ''}
-    ${catsUsed.length > 0 ? `
-    <div class="summary-section">
-      <h3>Selected permissions by category</h3>
-      ${catsUsed.map(cat => {
-        const selected = cat.permissions.filter(p => role.permissions.has(permKey(cat.category, p.action)));
-        return `<div class="summary-cat">
-          <div class="summary-cat-name">${escHtml(cat.category)}<span class="summary-cat-count">${selected.length} of ${cat.permissions.length}</span></div>
-          <div class="summary-perms">${selected.map(p =>
-            `<span class="perm-chip${isDestructive(cat.category, p.action) ? ' warn' : ''}">${escHtml(p.action)}</span>`).join('')}</div>
-        </div>`;
-      }).join('')}
-    </div>` : ''}
-  `;
-  modal.classList.add('open');
-  document.getElementById('summary-modal-close-btn').focus();
-}
-
-function closeSummaryModal() { document.getElementById('summary-modal').classList.remove('open'); }
-
 // ── Render Helpers ────────────────────────────────────────────────────────────
-function countCategoriesUsed(role) {
-  return PERMISSIONS_DATA.filter(cat =>
-    cat.permissions.some(p => role.permissions.has(permKey(cat.category, p.action)))
-  ).length;
-}
-
-function updatePermStats() {
-  const role = getActiveRole();
-  const el   = document.getElementById('perm-stats');
-  if (!el || !role) return;
-  const count = role.permissions.size;
-  const cats  = countCategoriesUsed(role);
-  el.innerHTML = `<strong>${count}</strong> of ${TOTAL_PERMISSIONS} permissions selected` +
-    (count ? ` <span class="meta-sep">·</span> ${plural(cats, 'category', 'categories')}` : '');
+// Everything that summarises the open role: the count line, the "to check" and "new" pills,
+// the tab badge, and the role's row in the sidebar.
+function updateRoleIndicators(role) {
+  const stats = document.getElementById('perm-stats');
+  if (stats) {
+    const count = role.permissions.size;
+    const cats  = countCategoriesUsed(role);
+    stats.innerHTML = `<strong>${count}</strong> of ${TOTAL_PERMISSIONS} permissions selected` +
+      (count ? ` <span class="meta-sep">·</span> ${plural(cats, 'category', 'categories')}` : '');
+  }
   const seg = document.getElementById('seg-selected-count');
-  if (seg) seg.textContent = count;
+  if (seg) seg.textContent = role.permissions.size;
+
+  const findings = runChecks(role, roles);
+  const checksPill = document.getElementById('checks-pill');
+  if (checksPill) {
+    checksPill.hidden = findings.length === 0;
+    checksPill.classList.toggle('pill-warn', findings.some(f => f.level === 'warn'));
+    checksPill.innerHTML = `${icon(ICON.alert, 12, 'stroke-width="2.4"')}${findings.length} to check`;
+  }
+
+  const fresh = newPermissionKeys(role);
+  const newPill = document.getElementById('new-pill');
+  if (newPill) {
+    newPill.hidden = fresh.length === 0;
+    newPill.innerHTML = `${icon(ICON.sparkle, 12, 'stroke-width="2.2"')}${fresh.length} new`;
+  }
+  const segNew = document.querySelector('.segmented button[data-filter="new"]');
+  if (segNew) {
+    segNew.hidden = fresh.length === 0;
+    segNew.querySelector('.seg-count').textContent = fresh.length;
+  }
+  const banner = document.getElementById('new-banner');
+  if (banner) banner.hidden = fresh.length === 0;
+
+  const tabCount = document.getElementById('tab-assignments-count');
+  if (tabCount) {
+    tabCount.textContent = role.assignments.length;
+    tabCount.hidden = role.assignments.length === 0;
+  }
+
+  updateSidebarRole(role, findings);
 }
 
-function updateSidebarCount(role) {
-  const el = document.querySelector(`.role-item[data-id="${role.id}"] .role-count`);
-  if (el) el.textContent = role.permissions.size;
+function updateSidebarRole(role, findings = runChecks(role, roles)) {
+  const item = document.querySelector(`.role-item[data-id="${role.id}"]`);
+  if (!item) return;
+  item.querySelector('.role-count').textContent = role.permissions.size;
+  const flag = item.querySelector('.role-flag');
+  const warns = findings.filter(f => f.level === 'warn').length;
+  flag.hidden = warns === 0;
+  flag.title = warns ? `${plural(warns, 'thing', 'things')} to check` : '';
 }
 
 function updateCategoryHeader(category) {
@@ -576,14 +854,59 @@ const clampObserver = new ResizeObserver(entries => {
   });
 });
 
+// ── Permission notes ──────────────────────────────────────────────────────────
+// An optional line per granted permission saying why the role needs it.
+function noteHtml(role, key) {
+  const text = role.notes[key];
+  return text
+    ? `<button type="button" class="perm-note-text" title="Edit note">${icon(ICON.note, 12)}<span>${escHtml(text)}</span></button>`
+    : `<button type="button" class="perm-note-add">${icon(ICON.note, 12)}Add a note</button>`;
+}
+
+function editNote(row) {
+  const role = getActiveRole();
+  if (!role) return;
+  const key  = permKey(row.dataset.cat, row.dataset.action);
+  const wrap = row.querySelector('.perm-note');
+  const input = document.createElement('input');
+  input.className = 'perm-note-input';
+  input.maxLength = 300;
+  input.placeholder = 'Why does this role need it? (optional)';
+  input.value = role.notes[key] || '';
+  input.setAttribute('aria-label', `Note for ${row.dataset.action}`);
+  wrap.innerHTML = '';
+  wrap.classList.remove('is-empty');
+  wrap.appendChild(input);
+  input.focus();
+
+  let done = false;
+  function finish(save) {
+    if (done) return;
+    done = true;
+    if (save) {
+      const text = input.value.trim();
+      if (text) role.notes[key] = text; else delete role.notes[key];
+      saveState();
+    }
+    wrap.innerHTML = noteHtml(role, key);
+    wrap.classList.toggle('is-empty', !role.notes[key]);
+  }
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape') { e.stopPropagation(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
 // ── Filtering ─────────────────────────────────────────────────────────────────
 function applyFilter() {
   const pane = document.getElementById('permissions-pane');
   const role = getActiveRole();
   if (!pane || !role) return;
 
-  const q            = searchQuery.toLowerCase().trim();
-  const selectedOnly = filterMode === 'selected';
+  const q         = searchQuery.toLowerCase().trim();
+  const freshKeys = new Set(newPermissionKeys(role));
+  if (filterMode === 'new' && freshKeys.size === 0) filterMode = 'all';
   let shown = 0;
 
   pane.querySelectorAll('.category-block').forEach(block => {
@@ -593,11 +916,15 @@ function applyFilter() {
 
     block.querySelectorAll('.perm-row').forEach(row => {
       const action = row.dataset.action, desc = row.dataset.desc;
+      const key    = permKey(cat, action);
       const textOk = !q || catMatches
         || action.toLowerCase().includes(q)
-        || desc.toLowerCase().includes(q);
-      const selOk  = !selectedOnly || role.permissions.has(permKey(cat, action));
-      const ok     = textOk && selOk;
+        || desc.toLowerCase().includes(q)
+        || (role.notes[key] || '').toLowerCase().includes(q);
+      const modeOk = filterMode === 'selected' ? role.permissions.has(key)
+                   : filterMode === 'new'      ? freshKeys.has(key)
+                   : true;
+      const ok = textOk && modeOk;
       row.classList.toggle('hidden-filter', !ok);
       if (ok) visible++;
       row.querySelector('.perm-action').innerHTML = highlight(action, q);
@@ -610,7 +937,7 @@ function applyFilter() {
   });
 
   // While filtering, every match is shown expanded and the bulk controls step aside
-  const filtering = !!q || selectedOnly;
+  const filtering = !!q || filterMode !== 'all';
   pane.classList.toggle('is-filtering', filtering);
   pane.classList.toggle('is-searching', !!q);
   document.getElementById('btn-expand-all').disabled   = filtering;
@@ -629,15 +956,17 @@ function applyFilter() {
   const empty = document.getElementById('no-results');
   empty.hidden = shown > 0;
   if (shown === 0) {
-    const nothingSelected = selectedOnly && !q && role.permissions.size === 0;
+    const nothingSelected = filterMode === 'selected' && !q && role.permissions.size === 0;
     empty.querySelector('h3').textContent = nothingSelected
       ? 'Nothing selected yet'
       : 'No permissions found';
     empty.querySelector('p').textContent = nothingSelected
       ? 'This role has no permissions. Switch back to All to start adding some.'
-      : selectedOnly
+      : filterMode === 'selected'
         ? `None of this role's selected permissions match "${searchQuery.trim()}".`
-        : `Nothing matches "${searchQuery.trim()}". Try a category, a permission name, or a word from its description.`;
+        : filterMode === 'new'
+          ? `None of the new permissions match "${searchQuery.trim()}".`
+          : `Nothing matches "${searchQuery.trim()}". Try a category, a permission name, or a word from its description.`;
     empty.querySelector('button').textContent = nothingSelected ? 'Show all permissions' : 'Clear filters';
   }
 }
@@ -648,6 +977,18 @@ function clearFilters() {
   const input = document.getElementById('perm-search');
   if (input) input.value = '';
   applyFilter();
+}
+
+function markReviewed(role) {
+  const previous = role.reviewed;
+  role.reviewed = CATALOG_DATE;
+  if (filterMode === 'new') filterMode = 'all';
+  saveState();
+  renderMainPanel();
+  showToast('Marked as reviewed.', 'success', {
+    label: 'Undo',
+    onClick: () => { role.reviewed = previous; saveState(); renderMainPanel(); }
+  });
 }
 
 // ── Mouse-based Drag & Drop ────────────────────────────────────────────────────
@@ -735,6 +1076,7 @@ function startMouseDrag(roleId, startX, startY, sourceEl) {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 function renderRoleItem(role) {
   const active = role.id === activeRoleId;
+  const warns  = runChecks(role, roles).filter(f => f.level === 'warn').length;
   const item = document.createElement('div');
   item.className = `role-item${active ? ' active' : ''}`;
   item.dataset.id = role.id;
@@ -751,6 +1093,7 @@ function renderRoleItem(role) {
     </div>
     <div class="role-icon ${hueClass(role.id)}">${escHtml(initials(role.name))}</div>
     <div class="role-name" title="${escHtml(role.name)}">${escHtml(role.name || 'Unnamed role')}</div>
+    <span class="role-flag" title="${warns ? `${plural(warns, 'thing', 'things')} to check` : ''}"${warns ? '' : ' hidden'}></span>
     <div class="role-count" title="Permissions selected">${role.permissions.size}</div>
   `;
 
@@ -906,7 +1249,10 @@ function renderEmptyState(panel) {
       <p>${roles.length
         ? 'Pick a role from the list to edit its permissions, or start a new one.'
         : 'Work out exactly which Intune permissions a custom role needs before you build it in the admin center.'}</p>
-      <button class="btn btn-primary btn-lg" id="btn-empty-new-role">${icon(ICON.plus, 16, 'stroke-width="2.4"')} New Role</button>
+      <div class="empty-actions">
+        <button class="btn btn-primary btn-lg" id="btn-empty-new-role">${icon(ICON.plus, 16, 'stroke-width="2.4"')} New Role</button>
+        <button class="btn btn-secondary btn-lg" id="btn-empty-built-in">${icon(ICON.template, 16)} Start from a built-in role</button>
+      </div>
       <ol class="empty-steps">
         <li><span class="step-num">1</span>Name the role</li>
         <li><span class="step-num">2</span>Tick the permissions it needs</li>
@@ -914,6 +1260,12 @@ function renderEmptyState(panel) {
       </ol>
     </div>`;
   document.getElementById('btn-empty-new-role').addEventListener('click', () => createRole());
+  document.getElementById('btn-empty-built-in').addEventListener('click', () => openBuiltInDialog());
+}
+
+function autoGrow(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = textarea.scrollHeight + 'px';
 }
 
 function renderMainPanel() {
@@ -929,6 +1281,8 @@ function renderMainPanel() {
           <div class="role-header-left">
             <input class="role-name-input" type="text" value="${escHtml(role.name)}"
               placeholder="Name this role" id="role-name-input" maxlength="100" aria-label="Role name" autocomplete="off" spellcheck="false"/>
+            <textarea class="role-desc-input" id="role-desc-input" rows="1" maxlength="500"
+              placeholder="Add a description: what is this role for?" aria-label="Role description">${escHtml(role.description)}</textarea>
             <div class="role-meta">
               <label class="folder-chip" title="Move to folder">
                 ${FOLDER_ICON(13)}
@@ -936,54 +1290,23 @@ function renderMainPanel() {
               </label>
               <span class="meta-sep">·</span>
               <div class="perm-stats" id="perm-stats"></div>
+              <button class="pill" id="checks-pill" title="See what to double-check in this role" hidden></button>
+              <button class="pill pill-new" id="new-pill" title="Permissions Microsoft added after this role was last reviewed" hidden></button>
             </div>
           </div>
           <div class="role-editor-actions">
             <button class="btn btn-secondary" id="btn-summary">${icon(ICON.summary, 15)} Summary</button>
             <button class="btn btn-secondary" id="btn-clone">${icon(ICON.copy, 15)} Clone</button>
+            <button class="btn btn-secondary" id="btn-intune" title="Get a script or JSON that creates this role in Intune">${icon(ICON.cloud, 15)} Create in Intune</button>
             <button class="btn btn-danger" id="btn-delete">${icon(ICON.trash, 15)} Delete</button>
           </div>
         </div>
-      </div>
-
-      <div class="perm-toolbar">
-        <div class="inner">
-          <div class="search-wrap">
-            ${icon(ICON.search, 15, 'class="search-icon"')}
-            <input class="search-input" type="text" placeholder="Search permissions" aria-label="Search permissions"
-              id="perm-search" value="${escHtml(searchQuery)}" autocomplete="off" spellcheck="false"/>
-            <kbd class="search-kbd" title="Press / to search">/</kbd>
-            <button class="search-clear" id="perm-search-clear" title="Clear search" aria-label="Clear search">${icon(ICON.x, 12, 'stroke-width="2.6"')}</button>
-          </div>
-          <div class="segmented" role="group" aria-label="Show">
-            <button data-filter="all">All</button>
-            <button data-filter="selected">Selected <span class="seg-count" id="seg-selected-count">0</span></button>
-          </div>
-          <span class="result-count" id="result-count" role="status" hidden></span>
-          <div class="toolbar-spacer"></div>
-          <label class="switch" title="Show each permission's description in the list">
-            <input type="checkbox" id="toggle-descriptions" ${showDescriptions ? 'checked' : ''}/>
-            <span class="switch-track"></span>
-            <span>Descriptions</span>
-          </label>
-          <div class="toolbar-group">
-            <button class="btn btn-ghost btn-sm" id="btn-expand-all" title="Expand all categories">${icon(ICON.expand, 15)}<span class="btn-label">Expand All</span></button>
-            <button class="btn btn-ghost btn-sm" id="btn-collapse-all" title="Collapse all categories">${icon(ICON.collapse, 15)}<span class="btn-label">Collapse All</span></button>
-          </div>
+        <div class="role-tabs" role="tablist">
+          <button class="tab" role="tab" data-tab="permissions">Permissions</button>
+          <button class="tab" role="tab" data-tab="assignments">Assignments <span class="tab-count" id="tab-assignments-count" hidden></span></button>
         </div>
       </div>
-
-      <div class="permissions-pane${showDescriptions ? '' : ' hide-descriptions'}" id="permissions-pane">
-        <div class="inner">
-          ${renderPermissionCategories(role)}
-          <div class="no-results" id="no-results" hidden>
-            ${icon(ICON.search, 30, 'stroke-width="1.6"')}
-            <h3></h3>
-            <p></p>
-            <button class="btn btn-secondary btn-sm" id="btn-clear-filters"></button>
-          </div>
-        </div>
-      </div>
+      <div class="tab-body" id="tab-body"></div>
     </div>`;
 
   // ── Header ──
@@ -995,18 +1318,109 @@ function renderMainPanel() {
     const iconEl = document.querySelector(`.role-item[data-id="${role.id}"] .role-icon`);
     if (nameEl) { nameEl.textContent = role.name || 'Unnamed role'; nameEl.title = role.name; }
     if (iconEl) iconEl.textContent = initials(role.name);
+    updateRoleIndicators(role);
   });
   nameInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === 'Escape') nameInput.blur();
+  });
+
+  const descInput = document.getElementById('role-desc-input');
+  autoGrow(descInput);
+  descInput.addEventListener('input', () => {
+    role.description = descInput.value;
+    saveState();
+    autoGrow(descInput);
+  });
+  descInput.addEventListener('keydown', e => {
+    if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) { e.preventDefault(); descInput.blur(); }
   });
 
   document.getElementById('role-group-select').addEventListener('change', e => {
     moveRoleToGroup(role.id, e.target.value);
   });
 
-  document.getElementById('btn-summary').addEventListener('click', () => openSummaryModal(role));
+  document.getElementById('btn-summary').addEventListener('click', () => openSummaryDialog(role));
   document.getElementById('btn-clone').addEventListener('click',   () => duplicateRole(role.id));
+  document.getElementById('btn-intune').addEventListener('click',  () => openIntuneExportDialog(role));
   document.getElementById('btn-delete').addEventListener('click',  () => deleteRole(role.id));
+  document.getElementById('checks-pill').addEventListener('click', () => openChecksDialog(role));
+  document.getElementById('new-pill').addEventListener('click', () => {
+    editorTab  = 'permissions';
+    filterMode = 'new';
+    renderEditorTab(role);
+  });
+
+  panel.querySelectorAll('.role-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => { editorTab = tab.dataset.tab; renderEditorTab(role); });
+  });
+
+  hideTooltip();
+  renderEditorTab(role);
+}
+
+function renderEditorTab(role) {
+  document.querySelectorAll('.role-tabs .tab').forEach(tab => {
+    const on = tab.dataset.tab === editorTab;
+    tab.classList.toggle('active', on);
+    tab.setAttribute('aria-selected', String(on));
+  });
+  const body = document.getElementById('tab-body');
+  clampObserver.disconnect();
+  if (editorTab === 'assignments') renderAssignmentsTab(body, role);
+  else renderPermissionsTab(body, role);
+  updateRoleIndicators(role);
+}
+
+function renderPermissionsTab(body, role) {
+  body.innerHTML = `
+    <div class="perm-toolbar">
+      <div class="inner">
+        <div class="search-wrap">
+          ${icon(ICON.search, 15, 'class="search-icon"')}
+          <input class="search-input" type="text" placeholder="Search permissions" aria-label="Search permissions"
+            id="perm-search" value="${escHtml(searchQuery)}" autocomplete="off" spellcheck="false"/>
+          <kbd class="search-kbd" title="Press / to search">/</kbd>
+          <button class="search-clear" id="perm-search-clear" title="Clear search" aria-label="Clear search">${icon(ICON.x, 12, 'stroke-width="2.6"')}</button>
+        </div>
+        <div class="segmented" role="group" aria-label="Show">
+          <button data-filter="all">All</button>
+          <button data-filter="selected">Selected <span class="seg-count" id="seg-selected-count">0</span></button>
+          <button data-filter="new" hidden>New <span class="seg-count">0</span></button>
+        </div>
+        <span class="result-count" id="result-count" role="status" hidden></span>
+        <div class="toolbar-spacer"></div>
+        <label class="switch" title="Show each permission's description in the list">
+          <input type="checkbox" id="toggle-descriptions" ${showDescriptions ? 'checked' : ''}/>
+          <span class="switch-track"></span>
+          <span>Descriptions</span>
+        </label>
+        <div class="toolbar-group">
+          <button class="btn btn-ghost btn-sm" id="btn-expand-all" title="Expand all categories">${icon(ICON.expand, 15)}<span class="btn-label">Expand All</span></button>
+          <button class="btn btn-ghost btn-sm" id="btn-collapse-all" title="Collapse all categories">${icon(ICON.collapse, 15)}<span class="btn-label">Collapse All</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="permissions-pane${showDescriptions ? '' : ' hide-descriptions'}" id="permissions-pane">
+      <div class="inner">
+        <div class="banner banner-new" id="new-banner" hidden>
+          ${icon(ICON.sparkle, 16, 'stroke-width="2.2"')}
+          <div class="banner-text">
+            <strong>Microsoft has added permissions since this role was last reviewed</strong>
+            <span>Last reviewed against the permission list of ${escHtml(formatDate(role.reviewed))}. Decide whether this role needs the new ones.</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-show-new">Show them</button>
+          <button class="btn btn-secondary btn-sm" id="btn-mark-reviewed">Mark as reviewed</button>
+        </div>
+        ${renderPermissionCategories(role)}
+        <div class="no-results" id="no-results" hidden>
+          ${icon(ICON.search, 30, 'stroke-width="1.6"')}
+          <h3></h3>
+          <p></p>
+          <button class="btn btn-secondary btn-sm" id="btn-clear-filters"></button>
+        </div>
+      </div>
+    </div>`;
 
   // ── Toolbar ──
   const searchInput = document.getElementById('perm-search');
@@ -1026,10 +1440,12 @@ function renderMainPanel() {
     searchInput.focus();
   });
 
-  panel.querySelectorAll('.segmented button').forEach(btn => {
+  body.querySelectorAll('.segmented button').forEach(btn => {
     btn.addEventListener('click', () => { filterMode = btn.dataset.filter; applyFilter(); });
   });
   document.getElementById('btn-clear-filters').addEventListener('click', clearFilters);
+  document.getElementById('btn-show-new').addEventListener('click', () => { filterMode = 'new'; applyFilter(); });
+  document.getElementById('btn-mark-reviewed').addEventListener('click', () => markReviewed(role));
 
   document.getElementById('toggle-descriptions').addEventListener('change', e => {
     showDescriptions = e.target.checked;
@@ -1038,18 +1454,18 @@ function renderMainPanel() {
   });
 
   document.getElementById('btn-expand-all').addEventListener('click', () => {
-    panel.querySelectorAll('.category-block').forEach(b => setCategoryCollapsed(b, false));
+    body.querySelectorAll('.category-block').forEach(b => setCategoryCollapsed(b, false));
   });
   document.getElementById('btn-collapse-all').addEventListener('click', () => {
-    panel.querySelectorAll('.category-block').forEach(b => setCategoryCollapsed(b, true));
+    body.querySelectorAll('.category-block').forEach(b => setCategoryCollapsed(b, true));
   });
 
   // ── Categories ──
-  panel.querySelectorAll('.category-toggle-all').forEach(btn => {
+  body.querySelectorAll('.category-toggle-all').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); toggleCategory(btn.dataset.cat); });
   });
 
-  panel.querySelectorAll('.category-header').forEach(header => {
+  body.querySelectorAll('.category-header').forEach(header => {
     const block = header.closest('.category-block');
     const toggle = () => {
       // Filtered results are always shown expanded
@@ -1067,7 +1483,7 @@ function renderMainPanel() {
   });
 
   // ── Permission rows ──
-  panel.querySelectorAll('.perm-row input[type="checkbox"]').forEach(cb => {
+  body.querySelectorAll('.perm-row input[type="checkbox"]').forEach(cb => {
     cb.addEventListener('change', async () => {
       const row    = cb.closest('.perm-row');
       const cat    = row.dataset.cat;
@@ -1084,10 +1500,9 @@ function renderMainPanel() {
     });
   });
 
-  clampObserver.disconnect();
-  panel.querySelectorAll('.perm-desc.is-long').forEach(desc => clampObserver.observe(desc));
+  body.querySelectorAll('.perm-desc.is-long').forEach(desc => clampObserver.observe(desc));
 
-  panel.querySelectorAll('.perm-more').forEach(btn => {
+  body.querySelectorAll('.perm-more').forEach(btn => {
     btn.addEventListener('click', () => {
       const row = btn.closest('.perm-row');
       const expanded = row.classList.toggle('expanded');
@@ -1097,19 +1512,23 @@ function renderMainPanel() {
     });
   });
 
+  document.getElementById('permissions-pane').addEventListener('click', e => {
+    const noteBtn = e.target.closest('.perm-note-add, .perm-note-text');
+    if (noteBtn) editNote(noteBtn.closest('.perm-row'));
+  });
+
   // With descriptions hidden, the full text is still one hover away
-  panel.querySelectorAll('.perm-label').forEach(label => {
+  body.querySelectorAll('.perm-label').forEach(label => {
     const desc = label.closest('.perm-row').dataset.desc;
     label.addEventListener('mouseenter', e => { if (!showDescriptions) showTooltip(desc, e); });
     label.addEventListener('mouseleave', hideTooltip);
   });
 
-  hideTooltip();
-  updatePermStats();
   applyFilter();
 }
 
 function renderPermissionCategories(role) {
+  const fresh = new Set(newPermissionKeys(role));
   return PERMISSIONS_DATA.map(cat => {
     const selCount = cat.permissions.filter(p => role.permissions.has(permKey(cat.category, p.action))).length;
     const hasSelected = selCount > 0;
@@ -1124,21 +1543,27 @@ function renderPermissionCategories(role) {
         </div>
         <div class="category-body">
           ${cat.permissions.map(perm => {
-            const checked = role.permissions.has(permKey(cat.category, perm.action));
+            const key     = permKey(cat.category, perm.action);
+            const checked = role.permissions.has(key);
             const isLong  = perm.description.length > CLAMP_FROM;
-            const flag    = isDestructive(cat.category, perm.action)
-              ? `<span class="perm-flag" title="You'll be asked to confirm before this is added">${icon(ICON.alert, 11, 'stroke-width="2.4"')}High impact</span>`
-              : '';
+            const flags   =
+              (fresh.has(key)
+                ? `<span class="perm-flag perm-flag-new" title="Added to Intune on ${escAttr(formatDate(perm.added))}">${icon(ICON.sparkle, 11, 'stroke-width="2.4"')}New</span>`
+                : '') +
+              (isDestructive(cat.category, perm.action)
+                ? `<span class="perm-flag" title="You'll be asked to confirm before this is added">${icon(ICON.alert, 11, 'stroke-width="2.4"')}High impact</span>`
+                : '');
             return `
               <div class="perm-row${checked ? ' selected' : ''}" data-cat="${escAttr(cat.category)}" data-action="${escAttr(perm.action)}" data-desc="${escAttr(perm.description)}">
                 <label class="perm-label">
                   <input type="checkbox" ${checked ? 'checked' : ''}/>
                   <span class="perm-main">
-                    <span class="perm-title"><span class="perm-action">${escHtml(perm.action)}</span>${flag}</span>
+                    <span class="perm-title"><span class="perm-action">${escHtml(perm.action)}</span>${flags}</span>
                     <span class="perm-desc${isLong ? ' is-long' : ''}">${escHtml(perm.description)}</span>
                   </span>
                 </label>
                 ${isLong ? '<button type="button" class="perm-more" aria-expanded="false" hidden>Show more</button>' : ''}
+                <div class="perm-note${role.notes[key] ? '' : ' is-empty'}">${noteHtml(role, key)}</div>
               </div>`;
           }).join('')}
         </div>
@@ -1220,7 +1645,8 @@ function initSidebarResize() {
 function initShortcuts() {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      if (document.getElementById('summary-modal').classList.contains('open')) closeSummaryModal();
+      if (openMenuEl) closeMenu();
+      else if (isDialogOpen()) closeDialog();
       else closeSidebar();
       return;
     }
@@ -1239,27 +1665,28 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSidebarWidth();
   loadViewPrefs();
   loadState();
+  loadGraphIds();
 
   initSidebarResize();
   initShortcuts();
+  initDialog();
 
   document.getElementById('btn-dark-mode').addEventListener('click', () => {
     applyDarkMode(document.documentElement.getAttribute('data-theme') !== 'dark');
   });
 
-  document.getElementById('btn-new-role').addEventListener('click',     () => createRole());
-  document.getElementById('btn-new-group').addEventListener('click',    () => createGroup());
+  document.getElementById('btn-new-role').addEventListener('click',  () => createRole());
+  document.getElementById('btn-new-role-menu').addEventListener('click', e => openNewRoleMenu(e.currentTarget));
+  document.getElementById('btn-new-group').addEventListener('click', () => createGroup());
+
+  document.getElementById('btn-compare').addEventListener('click',      () => openCompareDialog());
+  document.getElementById('btn-find').addEventListener('click',         () => openFindDialog());
   document.getElementById('btn-export-excel').addEventListener('click', () => exportToExcel(roles));
   document.getElementById('btn-export-image').addEventListener('click', () => exportComparisonImage(roles));
+  document.getElementById('btn-data').addEventListener('click',         () => openDataDialog());
 
   document.getElementById('btn-open-sidebar').addEventListener('click', openSidebar);
   document.getElementById('sidebar-backdrop').addEventListener('click', closeSidebar);
-
-  document.getElementById('summary-modal-close').addEventListener('click',     closeSummaryModal);
-  document.getElementById('summary-modal-close-btn').addEventListener('click', closeSummaryModal);
-  document.getElementById('summary-modal').addEventListener('click', e => {
-    if (e.target === document.getElementById('summary-modal')) closeSummaryModal();
-  });
 
   render();
 });

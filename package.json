@@ -29,10 +29,7 @@
     "files": [
       "index.html",
       "styles.css",
-      "app.js",
-      "permissions.js",
-      "export-excel.js",
-      "export-image.js",
+      "*.js",
       "vendor/**",
       "desktop/**",
       "LICENSE"

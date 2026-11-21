@@ -61,6 +61,14 @@ async function nextExport(dir, pattern, trigger) {
   check('permission catalogue loaded', loaded.categories === 53, `${loaded.categories} categories`);
   check('bundled export libraries loaded', loaded.xlsx && loaded.html2canvas, JSON.stringify(loaded));
 
+  // Every script the page asks for has to be inside the packaged app
+  const features = await page.evaluate(() => ({
+    builtInRoles: typeof BUILT_IN_ROLES === 'undefined' ? 0 : BUILT_IN_ROLES.length,
+    missing: ['runChecks', 'renderAssignmentsTab', 'openCompareDialog', 'openFindDialog', 'openDataDialog', 'openIntuneExportDialog']
+      .filter(name => typeof window[name] !== 'function'),
+  }));
+  check('all feature scripts are in the build', features.builtInRoles === 9 && features.missing.length === 0, JSON.stringify(features));
+
   // Start from a clean slate so the test is repeatable on a developer machine too
   await page.evaluate(() => { localStorage.clear(); });
   await page.reload();
@@ -92,6 +100,13 @@ async function nextExport(dir, pattern, trigger) {
   const downloads = await app.evaluate(({ app }) => app.getPath('downloads'));
   fs.mkdirSync(downloads, { recursive: true });
 
+  await page.click('#btn-data');
+  const backup = await nextExport(downloads, /^Intune-RBAC-Designer-backup-.*\.json$/, () => page.click('#data-backup'));
+  let backedUp = [];
+  try { backedUp = JSON.parse(fs.readFileSync(backup, 'utf8')).roles.map(r => r.name); } catch { /* reported below */ }
+  check('backup file lands in Downloads', backedUp.length === 1 && backedUp[0] === 'Smoke Test Role', String(backup));
+  await page.keyboard.press('Escape');
+
   const xlsx = await nextExport(downloads, /^Intune-RBAC-Roles-.*\.xlsx$/, () => page.click('#btn-export-excel'));
   check('Excel export lands in Downloads',
     !!xlsx && fs.readFileSync(xlsx).subarray(0, 2).toString() === 'PK', String(xlsx));
@@ -111,7 +126,7 @@ async function nextExport(dir, pattern, trigger) {
   await page.evaluate(() => { localStorage.clear(); });
   await app.close();
 
-  for (const file of [xlsx, png]) if (file && fs.existsSync(file)) fs.unlinkSync(file);
+  for (const file of [backup, xlsx, png]) if (file && fs.existsSync(file)) fs.unlinkSync(file);
 
   console.log(failures ? `\n${failures} check(s) failed` : '\nAll checks passed');
   process.exit(failures ? 1 : 0);

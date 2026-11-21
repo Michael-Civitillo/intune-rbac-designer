@@ -26,7 +26,15 @@ Good to know:
 
 ## What it does
 
+### Build a role
+
 **Design roles visually** — Browse all 53 Intune permission categories (pulled from Microsoft Learn), check off the exact permissions each role needs, and see a live count as you go.
+
+**Start from a built-in role** — Open the arrow next to **New Role** and pick one of Microsoft's nine built-in roles (Help Desk Operator, Read Only Operator, and so on). You get an editable copy with the same permissions, ready to trim down.
+
+**Describe and justify it** — Give each role a description, and add a note to any granted permission saying why the role needs it. Both travel with the summary and the Excel export, which makes change requests easier.
+
+**Plan the assignments** — The **Assignments** tab records who would get the role and over what: Admin Groups, Scope (Groups) and Scope (Tags), named the way Intune's assignment wizard names them. A role can have several.
 
 **Organize with folders** — Group roles by team (Windows, macOS, Mobile, Security, etc.). Drag roles between folders or drop them into "No Folder" to reorganize on the fly. Hover a folder to add a role to it, rename it, or delete it.
 
@@ -34,15 +42,33 @@ Good to know:
 
 **Search and filter** — Search matches permission names, descriptions and category names, highlights what it found, and opens the matching categories for you. Press `/` to jump to the search box and `Esc` to clear it. Switch from **All** to **Selected** to review just what a role grants.
 
-**Role summary** — Hit **Summary** on any role to get a quick overview: how many permissions are selected, how many categories they span, how many are high impact, and a full breakdown.
-
 **Clone roles** — Duplicate an existing role as a starting point instead of building from scratch.
+
+### Review it
+
+**Checks** — The app points out likely mistakes: permissions to change something without the Read that lets an admin open it, requirements Microsoft states outright (for example, remote actions also need visibility of devices), roles that can change role assignments, deprecated permissions, and half-finished assignments. A pill on the role shows the count, most findings have a one-click fix, and nothing is ever blocked.
+
+**See what's new** — When Microsoft adds permissions, roles designed before then show a **New** marker with a filter for just those permissions. Decide whether the role needs them, then choose **Mark as reviewed**.
+
+**Compare roles** — Pick two or more roles and see them side by side, with a switch to show only where they differ. The comparison can be saved as an image.
+
+**Who has a permission?** — Flip the question round: search for a permission such as *Wipe* and see every role that grants it. Click a role to jump straight to it.
+
+**Role summary** — Hit **Summary** on any role to get a quick overview: how many permissions are selected, how many categories they span, how many are high impact, plus the notes, checks and planned assignments.
+
+### Share it and keep it
 
 **Undo instead of "Are you sure?"** — Deleting a role or folder happens straight away, with an **Undo** button in the notification that puts it back exactly where it was.
 
-**Export to Excel** — One workbook, one sheet per role, plus a summary sheet. Selected permissions are highlighted green. Ready to share with your team or attach to a change request.
+**Export to Excel** — One workbook, one sheet per role, plus a summary sheet and a sheet of planned assignments. Selected permissions are highlighted green and carry their notes. Ready to share with your team or attach to a change request.
 
 **Export comparison image** — Generate a side-by-side PNG of all roles showing which permissions each one has selected. Useful for reviews and documentation.
+
+**Backup and restore** — **Backup and Import** saves everything to one file, and brings a file back in either alongside your current roles or in place of them. Use it to move between PCs or hand a design to a colleague.
+
+**Create the role in Intune** — **Create in Intune** writes a PowerShell script, or the JSON for Microsoft Graph, that creates the role for you. It can also bring in the roles that already exist in your tenant. Both need Intune's internal permission IDs, which the app learns once from your tenant; see [Working with your Intune tenant](#working-with-your-intune-tenant).
+
+### Everyday comforts
 
 **Resizable sidebar** — Drag the right edge of the sidebar to make the role column wider or narrower. Long role names and folder names display in full at whatever width you choose. The width is remembered between sessions; double-click the edge to reset it.
 
@@ -52,7 +78,7 @@ Good to know:
 
 **Keyboard and small screens** — Roles, folders, categories and checkboxes are all reachable from the keyboard. On a narrow window the role list tucks into a slide-out panel.
 
-**Persists locally** — Everything saves to `localStorage` automatically. Your roles are there next time you open the file.
+**Persists locally** — Everything saves automatically on your own machine. Your roles are there next time you open the app.
 
 ---
 
@@ -93,6 +119,11 @@ Everything is vanilla HTML, CSS, and JavaScript. No frameworks, no build pipelin
 | `styles.css` | Full token-based theming (light + dark) |
 | `app.js` | All app logic — state, rendering, drag-and-drop |
 | `permissions.js` | All 53 Intune permission categories and descriptions |
+| `built-in-roles.js` | Microsoft's nine built-in roles, used as starting points |
+| `assignments.js` | The Assignments tab |
+| `checks.js` | The sanity checks and their rules |
+| `review.js` | Summary, built-in role picker, compare view, "who has a permission?" |
+| `data.js` | Backup and restore, and the Intune export and import |
 | `export-excel.js` | Excel export via SheetJS |
 | `export-image.js` | Comparison PNG via html2canvas |
 | `vendor/` | SheetJS and html2canvas, bundled so everything works offline |
@@ -143,15 +174,39 @@ The `permissions.js` file contains all Intune custom role permission scopes pull
 
 Permission names and descriptions are Microsoft's wording, so what you see here is what you'll look for in the Intune admin center. That includes a few quirks in *Remote tasks*, such as the trailing period on *Sync devices.* and *Get FileVault key.*
 
-If Microsoft adds new permissions in a future update, edit `permissions.js` to add them — the rest of the app picks them up automatically. If Microsoft renames one, add it to `PERMISSION_RENAMES` at the bottom of the same file: roles saved under the old name are carried over to the new one the next time the app loads.
+If Microsoft adds new permissions in a future update, edit `permissions.js` to add them — the rest of the app picks them up automatically. Give each new one an `added: "YYYY-MM-DD"` date and move `CATALOG_DATE` forward, and existing roles will flag it as **New** for review. If Microsoft renames one, add it to `PERMISSION_RENAMES` at the bottom of the same file: roles saved under the old name are carried over to the new one the next time the app loads.
+
+The built-in roles in `built-in-roles.js` come from Microsoft's [built-in role permissions](https://learn.microsoft.com/intune/fundamentals/role-based-access-control/ref-built-in-roles) reference.
+
+---
+
+## Working with your Intune tenant
+
+Intune identifies every permission by an internal ID, and Microsoft doesn't publish those IDs as a list. The app needs them to write a role Intune will accept, and to read roles exported from Intune. Your tenant can list them, and the app only needs that list once.
+
+1. With an account that can read Intune role settings, get the list. In [Graph Explorer](https://developer.microsoft.com/graph/graph-explorer), run a GET request for `https://graph.microsoft.com/beta/deviceManagement/resourceOperations` and copy the response. Or in PowerShell:
+
+   ```
+   Connect-MgGraph -Scopes "DeviceManagementRBAC.Read.All"
+   Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/beta/deviceManagement/resourceOperations" -OutputType Json | Set-Content resourceOperations.json
+   ```
+
+2. In the app, open **Backup and Import** and choose the file, or paste the text. The app matches each entry to its permission by name and tells you how many it matched.
+
+From then on:
+
+- **Create in Intune** on any role gives you a PowerShell script or Graph JSON. The script creates the role definition; assignments are still made in the admin center, and your planned ones are listed in the script as comments.
+- To **import existing roles**, export `https://graph.microsoft.com/beta/deviceManagement/roleDefinitions` the same way and bring that file in. You choose which roles to import; they arrive in an "Imported from Intune" folder.
+
+Nothing is sent anywhere by the app itself. It stays offline: you run the Graph requests, and you run the script.
 
 ---
 
 ## Local storage
 
-Roles and folders are saved to `localStorage` under the key `intuneRbacRoles`. If you want to back up your work or move it to another machine, open DevTools → Application → Local Storage, copy the value, and paste it on the other machine. (In the Windows app, press Alt to show the menu, then **View → Toggle Developer Tools**.)
+Roles and folders are saved to `localStorage` under the key `intuneRbacRoles`. To back up your work or move it to another machine, use **Backup and Import** in the sidebar: it saves one file and reads it back in.
 
-The Windows app and the browser version each keep their own copy; they don't share roles.
+The Windows app and the browser version each keep their own copy; they don't share roles. A backup file is how you move between them.
 
 Data format is versioned — the app handles migrating from older saves automatically.
 
