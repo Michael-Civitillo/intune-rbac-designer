@@ -94,7 +94,7 @@ function renderAssignmentsTab(body, role) {
       return;
     }
     list.innerHTML = role.assignments.map((a, i) => `
-      <section class="assign-card" data-id="${a.id}">
+      <section class="assign-card" data-id="${escAttr(a.id)}">
         <div class="assign-card-head">
           <input class="assign-name" type="text" maxlength="100" value="${escHtml(a.name)}" placeholder="Assignment name, for example EMEA service desk" aria-label="Assignment ${i + 1} name" autocomplete="off" spellcheck="false"/>
           <button class="icon-btn assign-delete" title="Remove this assignment" aria-label="Remove this assignment">${icon(ICON.trash, 15)}</button>
@@ -143,8 +143,11 @@ function renderAssignmentsTab(body, role) {
       label: 'Undo',
       onClick: () => {
         role.assignments.splice(Math.min(index, role.assignments.length), 0, removed);
-        changed();
-        if (getActiveRole() === role && editorTab === 'assignments') draw();
+        saveState();
+        // The user may have moved to another role or tab since; redraw from scratch
+        // rather than through this (possibly discarded) view.
+        if (getActiveRole() === role) renderMainPanel();
+        else updateSidebarRole(role);
       }
     });
   }

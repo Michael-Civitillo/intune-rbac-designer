@@ -1,6 +1,9 @@
-// Excel sheet names: 31 characters at most, none of : \ / ? * [ ], and no two alike
+// Excel sheet names: 31 characters at most, none of : \ / ? * [ ], no apostrophe at either
+// end, not "History" (Excel reserves it), and no two alike
 function uniqueSheetName(name, taken) {
-  const base = (name || 'Unnamed Role').replace(/[:\\\/\?\*\[\]]/g, '').trim().substring(0, 31) || 'Role';
+  const trimQuotes = text => text.replace(/^['\s]+|['\s]+$/g, '');
+  let base = trimQuotes(trimQuotes((name || 'Unnamed Role').replace(/[:\\\/\?\*\[\]]/g, '')).substring(0, 31)) || 'Role';
+  if (base.toLowerCase() === 'history') base = 'History role';
   let candidate = base;
   for (let n = 2; taken.has(candidate.toLowerCase()); n++) {
     const suffix = ` (${n})`;
@@ -15,6 +18,16 @@ function exportToExcel(roles) {
     showToast('No roles to export.', 'error');
     return;
   }
+  try {
+    buildAndSaveWorkbook(roles);
+    showToast('Excel file exported successfully!', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast("The Excel file couldn't be created. Nothing was exported.", 'error');
+  }
+}
+
+function buildAndSaveWorkbook(roles) {
 
   const wb = XLSX.utils.book_new();
   // "Summary" and "Assignments" are this workbook's own sheets
@@ -105,7 +118,6 @@ function exportToExcel(roles) {
 
   XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
 
-  const date = new Date().toISOString().slice(0, 10);
+  const date = todayStamp();
   XLSX.writeFile(wb, `Intune-RBAC-Roles-${date}.xlsx`);
-  showToast('Excel file exported successfully!', 'success');
 }

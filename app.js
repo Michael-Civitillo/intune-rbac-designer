@@ -2,7 +2,8 @@
 // A role looks like:
 //   { id, name, groupId, permissions: Set<permKey>, description, notes: { permKey: text },
 //     assignments: [{ id, name, description, adminGroups, scopeGroups, scopeTags }],
-//     reviewed: 'YYYY-MM-DD' }   // the permission list revision it was last reviewed against
+//     reviewed: 'YYYY-MM-DD',    // the permission list revision it was last reviewed against
+//     unknown: [permKey] }       // saved permissions this version's list doesn't have
 let roles             = [];
 let groups            = [];   // [{ id, name, collapsed }]
 let activeRoleId      = null;
@@ -98,12 +99,30 @@ function isTypingTarget(el) {
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
 }
 
+// Accepts a plain date ('2026-11-12') or a full timestamp, and shows it in local time
 function formatDate(iso) {
-  const d = new Date(`${iso}T00:00:00`);
-  return isNaN(d) ? iso : d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  const text = String(iso);
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00` : text);
+  return isNaN(d) ? text : d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-function todayStamp() { return new Date().toISOString().slice(0, 10); }
+// Today's date as the user sees it on their own clock (not UTC), for file names
+function todayStamp() {
+  const d = new Date();
+  const two = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+}
+
+// Ids end up in HTML attributes and selectors, so anything read from storage or a file is
+// only kept if it has the shape this app generates. Otherwise it gets a fresh one.
+function safeId(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : uid();
+}
+
+// Names are single-line everywhere they are shown or exported
+function oneLine(text) {
+  return String(text == null ? '' : text).replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ').trim();
+}
 
 // ── Permission catalogue lookups ──────────────────────────────────────────────
 // permKey -> { category, action, description, added? }
@@ -135,6 +154,7 @@ function makeRole(fields = {}) {
     id: uid(), name: 'New Role', groupId: null,
     permissions: new Set(), description: '', notes: {}, assignments: [],
     reviewed: CATALOG_DATE,
+    unknown: [],
     ...fields,
   };
 }
@@ -144,13 +164,14 @@ function makeAssignment(fields = {}) {
 }
 
 function cleanList(list) {
-  return Array.isArray(list) ? [...new Set(list.map(v => String(v).trim()).filter(Boolean))] : [];
+  return Array.isArray(list) ? [...new Set(list.map(oneLine).filter(Boolean))] : [];
 }
 
 function serializeRole(r) {
   return {
     id: r.id, name: r.name, groupId: r.groupId || null,
-    permissions: Array.from(r.permissions),
+    // Permissions this version doesn't know are kept in the file, so a newer version gets them back
+    permissions: [...r.permissions, ...(r.unknown || [])],
     description: r.description || '',
     notes: r.notes || {},
     assignments: (r.assignments || []).map(a => ({
@@ -183,24 +204,54 @@ function migrateNotes(notes) {
   return out;
 }
 
-// Turns saved data (any version, or an imported file) back into a role.
+// Turns saved data (any version, or an imported file) back into a role. Nothing in `raw` is
+// trusted: wrong types fall back to defaults, and ids are regenerated unless well-formed.
 // Saves from before `reviewed` existed predate every permission that carries an `added` date.
-function reviveRole(raw) {
+// `groupIds` maps the folder ids used in the data to the ids the revived folders ended up with.
+function reviveRole(raw, groupIds = null) {
+  if (!raw || typeof raw !== 'object') return null;
+  const isObject = v => v && typeof v === 'object';
+  const keys = migratePermissions((Array.isArray(raw.permissions) ? raw.permissions : []).filter(k => typeof k === 'string'));
+  const known = new Set(), unknown = [];
+  keys.forEach(k => (PERM_INDEX.has(k) ? known.add(k) : unknown.push(k)));
   return makeRole({
-    id: raw.id || uid(),
-    name: typeof raw.name === 'string' ? raw.name : '',
-    groupId: raw.groupId || null,
-    permissions: migratePermissions(Array.isArray(raw.permissions) ? raw.permissions : []),
+    id: safeId(raw.id),
+    name: typeof raw.name === 'string' ? oneLine(raw.name) : '',
+    groupId: groupIds ? (groupIds.get(raw.groupId) || null) : null,
+    permissions: known,
+    unknown,
     description: typeof raw.description === 'string' ? raw.description : '',
     notes: migrateNotes(raw.notes),
-    assignments: (Array.isArray(raw.assignments) ? raw.assignments : []).map(a => makeAssignment({
-      id: a.id || uid(),
-      name: typeof a.name === 'string' ? a.name : '',
-      description: typeof a.description === 'string' ? a.description : '',
+    assignments: (Array.isArray(raw.assignments) ? raw.assignments : []).filter(isObject).map(a => makeAssignment({
+      id: safeId(a.id),
+      name: typeof a.name === 'string' ? oneLine(a.name) : '',
+      description: typeof a.description === 'string' ? oneLine(a.description) : '',
       adminGroups: cleanList(a.adminGroups), scopeGroups: cleanList(a.scopeGroups), scopeTags: cleanList(a.scopeTags),
     })),
-    reviewed: typeof raw.reviewed === 'string' ? raw.reviewed : CATALOG_BASELINE,
+    reviewed: typeof raw.reviewed === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.reviewed) ? raw.reviewed : CATALOG_BASELINE,
   });
+}
+
+// Folders from saved data or a file: returns them with safe ids, plus a map from the ids the
+// data used to the ids now in use, so roles can be put back in the right folder.
+function reviveGroups(rawGroups) {
+  const ids = new Map();
+  const list = [];
+  (Array.isArray(rawGroups) ? rawGroups : []).forEach(g => {
+    if (!g || typeof g !== 'object' || ids.has(g.id)) return;
+    const group = { id: safeId(g.id), name: oneLine(g.name) || 'Folder', collapsed: !!g.collapsed };
+    ids.set(g.id, group.id);
+    list.push(group);
+  });
+  return { groups: list, ids };
+}
+
+// Both of the above for a whole save or backup
+function reviveAll(data) {
+  const revived = reviveGroups(Array.isArray(data) ? [] : data.groups);
+  const rawRoles = Array.isArray(data) ? data : (Array.isArray(data.roles) ? data.roles : []);
+  const list = rawRoles.map(r => reviveRole(r, revived.ids)).filter(Boolean);
+  return { groups: revived.groups, roles: list, skipped: rawRoles.length - list.length };
 }
 
 function saveState() {
@@ -212,23 +263,34 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+// Set when saved data could not be read in full; shown to the user once the app is up
+let loadProblem = '';
+
+// Saved data the app could not read is set aside under its own key rather than lost: the next
+// save would otherwise overwrite it. "Backup and import" offers it back as a file.
+const UNREADABLE_KEY = `${STORAGE_KEY}.unreadable`;
+
+function keepUnreadable(raw) {
+  try { localStorage.setItem(UNREADABLE_KEY, raw); return true; } catch { return false; }
+}
+
 function loadState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return;
+  const where = kept => (kept ? ' The original data has been kept: open Backup and import to save it as a file.' : '');
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const data = JSON.parse(raw);
-
-    // Backward-compat: the first format was a plain array of roles
-    if (Array.isArray(data)) {
-      roles  = data.map(r => reviveRole({ ...r, groupId: null }));
-      groups = [];
-    } else {
-      groups = (data.groups || []).map(g => ({ id: g.id, name: g.name, collapsed: !!g.collapsed }));
-      roles  = (data.roles  || []).map(reviveRole);
+    // Handles every format so far, including the first one: a plain array of roles
+    const revived = reviveAll(JSON.parse(raw));
+    groups = revived.groups;
+    roles  = revived.roles;
+    if (revived.skipped) {
+      loadProblem = `${plural(revived.skipped, 'saved role', 'saved roles')} couldn't be read and ${revived.skipped === 1 ? 'was' : 'were'} left out.${where(keepUnreadable(raw))}`;
     }
-
-    if (roles.length > 0) activeRoleId = roles[0].id;
-  } catch { roles = []; groups = []; }
+  } catch {
+    roles = []; groups = [];
+    loadProblem = `Your saved roles couldn't be read, so the app has started empty.${where(keepUnreadable(raw))}`;
+  }
+  if (roles.length > 0) activeRoleId = roles[0].id;
 }
 
 function loadViewPrefs() {
@@ -257,7 +319,8 @@ function showToast(msg, type = '', action = null) {
   toast.className = `toast ${type}`;
   requestAnimationFrame(() => toast.classList.add('show'));
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(hideToast, action ? 8000 : 3000);
+  // A sticky toast stays until its button is pressed
+  if (!action?.sticky) toastTimer = setTimeout(hideToast, action ? 8000 : 3000);
 }
 
 function hideToast() {
@@ -307,6 +370,7 @@ function openDialog({ eyebrow = '', title, body = '', footer = '', size = 'md', 
   box.className = `modal modal-${size}`;
   dialogOnClose = onClose;
   overlay.classList.add('open');
+  setBackgroundInert(true);
   const first = footerEl.querySelector('[data-close]') || document.getElementById('dialog-close');
   if (first) first.focus();
   return { box, body: bodyEl, footer: footerEl };
@@ -316,9 +380,16 @@ function closeDialog() {
   const overlay = document.getElementById('dialog');
   if (!overlay.classList.contains('open')) return;
   overlay.classList.remove('open');
+  setBackgroundInert(false);
   const done = dialogOnClose;
   dialogOnClose = null;
   if (done) done();
+}
+
+// While a dialog is up, the page behind it is out of reach of the keyboard too
+function setBackgroundInert(on) {
+  const anyOpen = on || !!document.querySelector('.modal-overlay.open');
+  document.querySelectorAll('.app-body, .mobile-bar').forEach(el => { el.inert = anyOpen; });
 }
 
 function isDialogOpen() { return document.getElementById('dialog').classList.contains('open'); }
@@ -326,8 +397,12 @@ function isDialogOpen() { return document.getElementById('dialog').classList.con
 function initDialog() {
   const overlay = document.getElementById('dialog');
   document.getElementById('dialog-close').addEventListener('click', closeDialog);
+  // A click on the backdrop closes the dialog, but only if the press started there too:
+  // selecting text and letting go just outside the box must not throw the dialog away.
+  let pressedOnBackdrop = false;
+  overlay.addEventListener('mousedown', e => { pressedOnBackdrop = e.target === overlay; });
   overlay.addEventListener('click', e => {
-    if (e.target === overlay || e.target.closest('[data-close]')) closeDialog();
+    if (e.target.closest('[data-close]') || (e.target === overlay && pressedOnBackdrop)) closeDialog();
   });
 }
 
@@ -589,6 +664,7 @@ function duplicateRole(id) {
       ...a, id: uid(), adminGroups: [...a.adminGroups], scopeGroups: [...a.scopeGroups], scopeTags: [...a.scopeTags],
     })),
     reviewed: src.reviewed,
+    unknown: [...(src.unknown || [])],
   });
   const idx = roles.findIndex(r => r.id === id);
   roles.splice(idx + 1, 0, copy);
@@ -631,14 +707,22 @@ function selectRole(id) {
   closeSidebar();
 }
 
-// Opens a role with the permission list filtered to `query` (used by "Who has a permission?")
-function showRolePermission(roleId, query) {
+// Opens a role and takes the user to one exact permission (used by "Who has a permission?")
+function showRolePermission(roleId, category, action) {
   activeRoleId = roleId;
-  searchQuery  = query;
+  searchQuery  = '';
   filterMode   = 'all';
   editorTab    = 'permissions';
   render();
   closeSidebar();
+
+  const row = [...document.querySelectorAll('#permissions-pane .perm-row')]
+    .find(r => r.dataset.cat === category && r.dataset.action === action);
+  if (!row) return;
+  setCategoryCollapsed(row.closest('.category-block'), false);
+  row.scrollIntoView({ block: 'center' });
+  row.classList.add('flash');
+  setTimeout(() => row.classList.remove('flash'), 2400);
 }
 
 function openNewRoleMenu(anchor) {
@@ -695,6 +779,7 @@ function confirmDestructive(items) {
 
     function cleanup() {
       modal.classList.remove('open');
+      setBackgroundInert(false);
       btnOk.removeEventListener('click', onOk);
       btnCancel.removeEventListener('click', onCancel);
       modal.removeEventListener('click', onBackdrop);
@@ -711,6 +796,7 @@ function confirmDestructive(items) {
     modal.addEventListener('click', onBackdrop);
     document.addEventListener('keydown', onKey, true);
     modal.classList.add('open');
+    setBackgroundInert(true);
     btnCancel.focus();
   });
 }
@@ -1319,6 +1405,8 @@ function renderMainPanel() {
     if (nameEl) { nameEl.textContent = role.name || 'Unnamed role'; nameEl.title = role.name; }
     if (iconEl) iconEl.textContent = initials(role.name);
     updateRoleIndicators(role);
+    // Whether a name is a duplicate depends on the other roles, so their markers can change too
+    roles.forEach(other => { if (other !== role) updateSidebarRole(other); });
   });
   nameInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === 'Escape') nameInput.blur();
@@ -1572,20 +1660,25 @@ function renderPermissionCategories(role) {
 }
 
 // ── Dark Mode ─────────────────────────────────────────────────────────────────
-function applyDarkMode(dark) {
+// `remember` is only true when the user picks a theme themselves. Until they do, the app
+// keeps following the system setting, including when it changes while the app is open.
+function applyDarkMode(dark, remember = false) {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   document.getElementById('icon-moon').style.display = dark ? 'none' : '';
   document.getElementById('icon-sun').style.display  = dark ? ''     : 'none';
   const btn = document.getElementById('btn-dark-mode');
   btn.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
   btn.setAttribute('aria-label', btn.title);
-  localStorage.setItem(DARK_MODE_KEY, dark ? '1' : '0');
+  if (remember) localStorage.setItem(DARK_MODE_KEY, dark ? '1' : '0');
 }
 
 function loadDarkMode() {
-  const saved = localStorage.getItem(DARK_MODE_KEY);
-  const prefersDark = saved !== null ? saved === '1' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-  applyDarkMode(prefersDark);
+  const system = window.matchMedia('(prefers-color-scheme: dark)');
+  const saved  = localStorage.getItem(DARK_MODE_KEY);
+  applyDarkMode(saved !== null ? saved === '1' : system.matches);
+  system.addEventListener('change', e => {
+    if (localStorage.getItem(DARK_MODE_KEY) === null) applyDarkMode(e.matches);
+  });
 }
 
 // ── Main Render ───────────────────────────────────────────────────────────────
@@ -1672,7 +1765,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDialog();
 
   document.getElementById('btn-dark-mode').addEventListener('click', () => {
-    applyDarkMode(document.documentElement.getAttribute('data-theme') !== 'dark');
+    applyDarkMode(document.documentElement.getAttribute('data-theme') !== 'dark', true);
   });
 
   document.getElementById('btn-new-role').addEventListener('click',  () => createRole());
@@ -1689,4 +1782,5 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('sidebar-backdrop').addEventListener('click', closeSidebar);
 
   render();
+  if (loadProblem) showToast(loadProblem, 'error', { label: 'OK', sticky: true, onClick: () => {} });
 });

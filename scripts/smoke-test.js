@@ -5,6 +5,7 @@
 
 const { _electron: electron } = require('playwright-core');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const exe = process.argv[2];
@@ -19,8 +20,16 @@ function check(name, ok, detail = '') {
   console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`);
 }
 
+// A profile of its own: the test creates and clears data, and must never do that to the
+// roles someone has saved in the real app on this machine.
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'intune-rbac-designer-test-'));
+
 async function launch() {
-  const app = await electron.launch({ executablePath: exe, timeout: 90_000 });
+  const app = await electron.launch({
+    executablePath: exe,
+    timeout: 90_000,
+    env: { ...process.env, INTUNE_RBAC_DESIGNER_PROFILE: profile },
+  });
   // Exports are revealed in Explorer once saved; a test run should not pop windows open
   await app.evaluate(({ shell }) => { shell.showItemInFolder = () => {}; }).catch(() => {});
   const page = await app.firstWindow();
@@ -50,6 +59,13 @@ async function nextExport(dir, pattern, trigger) {
   page.on('pageerror', e => pageErrors.push(String(e)));
 
   check('window title', (await page.title()) === 'Intune RBAC Designer', await page.title());
+  const userData = await app.evaluate(({ app }) => app.getPath('userData'));
+  check('runs in its own test profile', path.resolve(userData) === path.resolve(profile), userData);
+  if (path.resolve(userData) !== path.resolve(profile)) {
+    console.error('Refusing to continue: the app is not using the test profile.');
+    await app.close();
+    process.exit(1);
+  }
   check('app version matches package.json',
     (await app.evaluate(({ app }) => app.getVersion())) === require('../package.json').version);
 
@@ -127,6 +143,7 @@ async function nextExport(dir, pattern, trigger) {
   await app.close();
 
   for (const file of [backup, xlsx, png]) if (file && fs.existsSync(file)) fs.unlinkSync(file);
+  fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 
   console.log(failures ? `\n${failures} check(s) failed` : '\nAll checks passed');
   process.exit(failures ? 1 : 0);

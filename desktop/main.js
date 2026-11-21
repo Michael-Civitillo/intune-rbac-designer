@@ -29,6 +29,12 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true } },
 ]);
 
+// The automated test points the app at a throwaway profile, so that running it on a PC
+// where the app is really used can never touch that person's saved roles.
+if (process.env.INTUNE_RBAC_DESIGNER_PROFILE) {
+  app.setPath('userData', process.env.INTUNE_RBAC_DESIGNER_PROFILE);
+}
+
 let mainWindow = null;
 
 // app://designer/<path> -> the matching file inside the app, and nothing outside it

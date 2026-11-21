@@ -160,7 +160,7 @@ function openCompareDialog() {
     root.innerHTML = `
       <div class="compare-controls">
         <div class="compare-pick" role="group" aria-label="Roles to compare">
-          ${roles.map(r => `<button class="chip-toggle${compareIds.has(r.id) ? ' on' : ''}" data-id="${r.id}" aria-pressed="${compareIds.has(r.id)}">
+          ${roles.map(r => `<button class="chip-toggle${compareIds.has(r.id) ? ' on' : ''}" data-id="${escAttr(r.id)}" aria-pressed="${compareIds.has(r.id)}">
             <span class="role-icon ${hueClass(r.id)}">${escHtml(initials(r.name))}</span>${escHtml(r.name || 'Unnamed role')}</button>`).join('')}
         </div>
         <div class="compare-options">
@@ -272,7 +272,7 @@ function openFindDialog() {
           <div class="find-holders">
             ${holders.length
               ? `<span class="find-count">${holders.length} of ${roles.length}</span>` + holders.map(r =>
-                  `<button class="holder-chip" data-role="${r.id}" data-action="${escAttr(p.action)}" title="Open ${escAttr(r.name)} at this permission"><span class="role-icon ${hueClass(r.id)}">${escHtml(initials(r.name))}</span>${escHtml(r.name || 'Unnamed role')}</button>`).join('')
+                  `<button class="holder-chip" data-role="${escAttr(r.id)}" data-category="${escAttr(s.category)}" data-action="${escAttr(p.action)}" title="Open ${escAttr(r.name)} at this permission"><span class="role-icon ${hueClass(r.id)}">${escHtml(initials(r.name))}</span>${escHtml(r.name || 'Unnamed role')}</button>`).join('')
               : '<span class="find-none">No role</span>'}
           </div>
         </div>`).join('')}`).join('');
@@ -280,7 +280,7 @@ function openFindDialog() {
     results.querySelectorAll('.holder-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         closeDialog();
-        showRolePermission(chip.dataset.role, chip.dataset.action);
+        showRolePermission(chip.dataset.role, chip.dataset.category, chip.dataset.action);
       });
     });
   }

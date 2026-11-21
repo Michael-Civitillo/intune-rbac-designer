@@ -75,8 +75,9 @@ function readResourceOperations(data) {
 // ── Recognising what a file is ────────────────────────────────────────────────
 function detectImport(data) {
   if (!data || typeof data !== 'object') return 'unknown';
-  const looksLikeRoles = list => Array.isArray(list) && list.every(r => r && typeof r === 'object' && Array.isArray(r.permissions) && 'name' in r);
-  if (!Array.isArray(data) && looksLikeRoles(data.roles)) return 'backup';   // this app's file, or its raw saved data
+  const looksLikeRoles = list => Array.isArray(list) && list.some(r => r && typeof r === 'object' && Array.isArray(r.permissions) && 'name' in r);
+  if (!Array.isArray(data) && data.app === 'intune-rbac-designer' && Array.isArray(data.roles)) return 'backup';
+  if (!Array.isArray(data) && looksLikeRoles(data.roles)) return 'backup';   // a raw copy of this app's saved data
   if (Array.isArray(data) && data.length && looksLikeRoles(data)) return 'backup'; // the oldest saved format
 
   const list = asList(data);
@@ -107,13 +108,15 @@ function saveBackupFile() {
   showToast('Backup saved.', 'success');
 }
 
+// A backup is someone else's file as far as the app is concerned: everything in it goes
+// through the same checks as saved data (see reviveRole), and ids are never taken on trust.
 function readBackup(data) {
-  const rawRoles  = Array.isArray(data) ? data : data.roles;
-  const rawGroups = Array.isArray(data) ? [] : (Array.isArray(data.groups) ? data.groups : []);
+  const revived = reviveAll(data);
   return {
-    exportedAt: Array.isArray(data) ? null : data.exportedAt || null,
-    groups: rawGroups.filter(g => g && g.id && typeof g.name === 'string').map(g => ({ id: g.id, name: g.name, collapsed: !!g.collapsed })),
-    roles: rawRoles.map(reviveRole),
+    exportedAt: !Array.isArray(data) && typeof data.exportedAt === 'string' ? data.exportedAt : null,
+    groups: revived.groups,
+    roles: revived.roles,
+    skipped: revived.skipped,
   };
 }
 
@@ -133,7 +136,7 @@ function restoreBackup(backup, mode) {
   const undo = snapshotState();
   if (mode === 'replace') {
     groups = backup.groups;
-    roles  = backup.roles.map(r => ({ ...r, groupId: backup.groups.some(g => g.id === r.groupId) ? r.groupId : null }));
+    roles  = backup.roles;
   } else {
     // Add alongside what is here: folders are matched by name, roles always arrive as new ones
     const folderFor = new Map(backup.groups.map(g => [g.id, ensureGroup(g.name).id]));
@@ -169,7 +172,7 @@ function readRoleDefinitions(data) {
         key ? keys.push(key) : unknown.push(id);
       });
       return {
-        name: def.displayName,
+        name: oneLine(def.displayName),
         description: typeof def.description === 'string' ? def.description : '',
         builtIn: !!(def.isBuiltIn || def.isBuiltInRoleDefinition),
         keys, unknown,
@@ -205,9 +208,10 @@ function buildRoleDefinition(role) {
   });
   return {
     missing,
+    unknown: role.unknown || [],
     body: {
       '@odata.type': '#microsoft.graph.deviceAndAppManagementRoleDefinition',
-      displayName: (role.name || '').trim() || 'Unnamed role',
+      displayName: oneLine(role.name) || 'Unnamed role',
       description: (role.description || '').trim(),
       isBuiltIn: false,
       rolePermissions: [{ resourceActions: [{ allowedResourceActions: allowed, notAllowedResourceActions: [] }] }],
@@ -217,7 +221,7 @@ function buildRoleDefinition(role) {
 
 function describeKey(key) {
   const { category, action } = splitKey(key);
-  return `${category} - ${action}`;
+  return oneLine(`${category} - ${action}`);
 }
 
 function buildIntuneJson(list) {
@@ -242,13 +246,19 @@ function buildPowerShell(list) {
     '$roles = @(',
   ];
   list.forEach((role, i) => {
-    const { body, missing } = buildRoleDefinition(role);
-    lines.push(`# ${body.displayName}: ${plural(body.rolePermissions[0].resourceActions[0].allowedResourceActions.length, 'permission', 'permissions')}`);
+    const { body, missing, unknown } = buildRoleDefinition(role);
+    // Everything written into a comment is flattened to one line first: a line break inside
+    // a name would otherwise end the comment and turn the rest into a command.
+    lines.push(`# ${oneLine(body.displayName)}: ${plural(body.rolePermissions[0].resourceActions[0].allowedResourceActions.length, 'permission', 'permissions')}`);
     if (missing.length) {
       lines.push(`# Left out, because your tenant's permission list has no ID for ${missing.length === 1 ? 'it' : 'them'}:`);
       missing.forEach(key => lines.push(`#   ${describeKey(key)}`));
     }
-    role.assignments.forEach(a => lines.push(`# Planned assignment - ${describeAssignment(a)}`));
+    if (unknown.length) {
+      lines.push(`# Left out, because this version of Intune RBAC Designer does not recognise ${unknown.length === 1 ? 'it' : 'them'}:`);
+      unknown.forEach(key => lines.push(`#   ${describeKey(key)}`));
+    }
+    role.assignments.forEach(a => lines.push(`# Planned assignment - ${oneLine(describeAssignment(a))}`));
     lines.push("@'", JSON.stringify(body, null, 2), `'@${i < list.length - 1 ? ',' : ''}`);
   });
   lines.push(
@@ -279,7 +289,7 @@ function graphStatusHtml() {
   const count = graphIdCount();
   if (!count) return `<p class="data-status">${icon(ICON.info, 15)}<span>Not loaded yet. They are only needed to create roles in Intune or to import roles from it.</span></p>`;
   const missing = TOTAL_PERMISSIONS - count;
-  return `<p class="data-status ok">${icon(ICON.check, 15, 'stroke-width="2.6"')}<span>IDs known for <strong>${count} of ${TOTAL_PERMISSIONS}</strong> permissions${graphIds.loadedAt ? `, loaded ${escHtml(formatDate(graphIds.loadedAt.slice(0, 10)))}` : ''}.${missing ? ` ${missing} had no match in your tenant's list.` : ''}${graphIds.unknown ? ` Your tenant lists ${graphIds.unknown} that this app doesn't know.` : ''}</span></p>`;
+  return `<p class="data-status ok">${icon(ICON.check, 15, 'stroke-width="2.6"')}<span>IDs known for <strong>${count} of ${TOTAL_PERMISSIONS}</strong> permissions${graphIds.loadedAt ? `, loaded ${escHtml(formatDate(graphIds.loadedAt))}` : ''}.${missing ? ` ${missing} had no match in your tenant's list.` : ''}${graphIds.unknown ? ` Your tenant lists ${graphIds.unknown} that this app doesn't know.` : ''}</span></p>`;
 }
 
 // ── "Backup and import" dialog ────────────────────────────────────────────────
@@ -289,13 +299,29 @@ function openDataDialog() {
     eyebrow: 'Your data',
     title: 'Backup and import',
     size: 'lg',
-    onClose: () => { open = false; },
+    onClose: () => {
+      open = false;
+      // The dialog element is shared, so its drop handlers must not outlive this dialog
+      const body = document.getElementById('dialog-body');
+      body.ondragover = null;
+      body.ondrop = null;
+    },
     body: `
       <section class="data-section">
         <h3>Save a backup</h3>
         <p>Everything in one file: roles, folders, descriptions, notes and planned assignments. Use it to keep a copy, move to another PC, or hand your design to a colleague.</p>
         <button class="btn btn-secondary" id="data-backup" ${roles.length ? '' : 'disabled'}>${icon(ICON.download, 15)} Save backup file</button>
       </section>
+
+      ${localStorage.getItem(UNREADABLE_KEY) === null ? '' : `
+      <section class="data-section" id="data-recover">
+        <h3>Saved data that couldn't be read</h3>
+        <p>When the app last started, some of what was saved on this PC couldn't be read. It was set aside rather than deleted. Save it as a file to keep it or to send to whoever supports this app, then remove it from here.</p>
+        <div class="data-actions">
+          <button class="btn btn-secondary" id="data-recover-save">${icon(ICON.download, 15)} Save it as a file</button>
+          <button class="btn btn-ghost" id="data-recover-discard">Remove it</button>
+        </div>
+      </section>`}
 
       <section class="data-section">
         <h3>Bring in a file</h3>
@@ -320,6 +346,17 @@ function openDataDialog() {
       </section>`,
   });
 
+  dialog.body.querySelector('#data-recover-save')?.addEventListener('click', () => {
+    downloadFile(`Intune-RBAC-Designer-unreadable-${todayStamp()}.txt`, localStorage.getItem(UNREADABLE_KEY) || '', 'text/plain');
+    showToast('File saved.', 'success');
+  });
+  dialog.body.querySelector('#data-recover-discard')?.addEventListener('click', () => {
+    const kept = localStorage.getItem(UNREADABLE_KEY);
+    localStorage.removeItem(UNREADABLE_KEY);
+    dialog.body.querySelector('#data-recover').remove();
+    showToast('Removed.', '', { label: 'Undo', onClick: () => { if (kept !== null) keepUnreadable(kept); } });
+  });
+
   const result = dialog.body.querySelector('#data-result');
   const say = (html, kind = '') => { result.innerHTML = `<div class="data-message ${kind}">${html}</div>`; };
 
@@ -329,8 +366,8 @@ function openDataDialog() {
   }
 
   function offerBackup(backup) {
-    const when = backup.exportedAt ? ` saved ${escHtml(formatDate(backup.exportedAt.slice(0, 10)))}` : '';
-    const summary = `<strong>Backup${when}</strong> with ${plural(backup.roles.length, 'role', 'roles')}${backup.groups.length ? ` in ${plural(backup.groups.length, 'folder', 'folders')}` : ''}.`;
+    const when = backup.exportedAt ? ` saved ${escHtml(formatDate(backup.exportedAt))}` : '';
+    const summary = `<strong>Backup${when}</strong> with ${plural(backup.roles.length, 'role', 'roles')}${backup.groups.length ? ` in ${plural(backup.groups.length, 'folder', 'folders')}` : ''}.${backup.skipped ? ` ${plural(backup.skipped, 'entry', 'entries')} in the file couldn't be read and will be skipped.` : ''}`;
     if (!backup.roles.length) { say(`${summary} There is nothing in it to restore.`, 'warn'); return; }
     say(`${summary}
       <div class="data-actions">
@@ -382,11 +419,17 @@ function openDataDialog() {
     let data;
     try { data = parseJson(text); }
     catch { say("That isn't valid JSON, so it can't be read. If you copied it, make sure you copied all of it.", 'error'); return; }
-    const kind = detectImport(data);
-    if (kind === 'backup') offerBackup(readBackup(data));
-    else if (kind === 'resourceOperations') takeIds(data, source);
-    else if (kind === 'roleDefinitions') offerRoleDefinitions(data);
-    else say("The file is valid JSON, but it isn't a backup from this app, a list of Intune roles, or Intune's permission IDs.", 'error');
+    try {
+      const kind = detectImport(data);
+      if (kind === 'backup') offerBackup(readBackup(data));
+      else if (kind === 'resourceOperations') takeIds(data, source);
+      else if (kind === 'roleDefinitions') offerRoleDefinitions(data);
+      else say("The file is valid JSON, but it isn't a backup from this app, a list of Intune roles, or Intune's permission IDs.", 'error');
+    } catch (err) {
+      // Whatever is wrong with the file, say so rather than leaving the dialog blank
+      console.error(err);
+      say("That file looks like the right kind, but something in it couldn't be read, so nothing was imported.", 'error');
+    }
   }
 
   dialog.body.querySelector('#data-backup').addEventListener('click', saveBackupFile);
@@ -415,7 +458,9 @@ function openDataDialog() {
   dialog.body.ondrop = async e => {
     e.preventDefault();
     const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (file) take(await file.text(), file.name);
+    if (!file) return;
+    const text = await file.text();
+    if (open) take(text, file.name);
   };
 
   drawGraphStatus();
@@ -453,6 +498,7 @@ function openIntuneExportDialog(role) {
     const text    = format === 'powershell' ? buildPowerShell(list) : buildIntuneJson(list);
     const missing = list.flatMap(r => buildRoleDefinition(r).missing.map(key => ({ r, key })));
     const empty   = list.filter(r => r.permissions.size === 0);
+    const unknown = list.reduce((n, r) => n + (r.unknown || []).length, 0);
 
     root.innerHTML = `
       <div class="intune-controls">
@@ -466,6 +512,7 @@ function openIntuneExportDialog(role) {
         <button class="btn btn-primary btn-sm" id="intune-download">${icon(ICON.download, 14)} Save file</button>
       </div>
       ${missing.length ? `<div class="data-message warn"><strong>${plural(missing.length, 'permission is', 'permissions are')} left out</strong> because your tenant's list has no ID for ${missing.length === 1 ? 'it' : 'them'}: ${escHtml(missing.slice(0, 6).map(m => describeKey(m.key)).join('; '))}${missing.length > 6 ? ` and ${missing.length - 6} more` : ''}.</div>` : ''}
+      ${unknown ? `<div class="data-message warn"><strong>${plural(unknown, 'permission is', 'permissions are')} left out</strong> because this version of the app doesn't recognise ${unknown === 1 ? 'it' : 'them'}. Open the role's checks for the details.</div>` : ''}
       ${empty.length ? `<div class="data-message warn">${everyRole ? `${plural(empty.length, 'role has', 'roles have')} no permissions selected.` : 'This role has no permissions selected.'}</div>` : ''}
       <pre class="code code-tall" id="intune-code"><code>${escHtml(text)}</code></pre>
       <p class="dialog-note">${format === 'powershell'

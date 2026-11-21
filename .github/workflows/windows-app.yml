@@ -23,9 +23,11 @@ on:
 permissions:
   contents: read
 
+# A newer push replaces an older test build of the same branch. A release run is in a group
+# of its own, so an ordinary push can never cancel it part-way through publishing.
 concurrency:
-  group: windows-app-${{ github.ref }}
-  cancel-in-progress: true
+  group: windows-app-${{ github.ref }}-${{ inputs.version && format('release-{0}', inputs.version) || 'build' }}
+  cancel-in-progress: ${{ !inputs.version }}
 
 jobs:
   build:

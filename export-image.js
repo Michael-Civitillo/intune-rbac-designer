@@ -111,7 +111,7 @@ async function exportComparisonImage(roles) {
     container.style.zIndex = 'auto';
 
     const link = document.createElement('a');
-    const date = new Date().toISOString().slice(0, 10);
+    const date = todayStamp();
     link.download = `Intune-RBAC-Comparison-${date}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();

@@ -67,6 +67,17 @@ function runChecks(role, allRoles = []) {
       detail: `Two roles called "${name}" are easy to mix up in Intune and in exports.` });
   }
 
+  // ── Saved permissions this version's list doesn't have ──
+  const unknown = role.unknown || [];
+  if (unknown.length) {
+    findings.push({
+      id: 'unknown-permissions', level: 'warn',
+      title: `${plural(unknown.length, 'saved permission is', 'saved permissions are')} not in this version's list`,
+      detail: `${unknown.slice(0, 4).map(k => { const { category, action } = splitKey(k); return `${category} – ${action}`; }).join('; ')}${unknown.length > 4 ? ` and ${unknown.length - 4} more` : ''}. This usually means the role came from a newer version of the app. They are kept in backups, but left out of the counts and of everything exported.`,
+      fix: { label: 'Remove them', clearUnknown: true },
+    });
+  }
+
   // ── Acting on something without being able to open it ──
   READ_PAIRS.forEach((pairs, category) => {
     pairs.forEach(({ read, writes }) => {
@@ -169,15 +180,18 @@ function runChecks(role, allRoles = []) {
 }
 
 function applyCheckFix(role, finding) {
-  const { add = [], remove = [] } = finding.fix;
+  const { add = [], remove = [], clearUnknown = false } = finding.fix;
   const added   = add.filter(k => !role.permissions.has(k));
   const removed = remove.filter(k => role.permissions.has(k));
+  const unknown = clearUnknown ? role.unknown : null;
   added.forEach(k => role.permissions.add(k));
   removed.forEach(k => role.permissions.delete(k));
+  if (clearUnknown) role.unknown = [];
   saveState();
   return () => {
     added.forEach(k => role.permissions.delete(k));
     removed.forEach(k => role.permissions.add(k));
+    if (unknown) role.unknown = unknown;
     saveState();
   };
 }

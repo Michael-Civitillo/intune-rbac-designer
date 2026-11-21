@@ -48,6 +48,9 @@
     "portable": {
       "artifactName": "Intune-RBAC-Designer-${version}-win-x64.${ext}",
       "splashImage": "build/splash.bmp"
-    }
+    },
+    "electronLanguages": [
+      "en-US"
+    ]
   }
 }
